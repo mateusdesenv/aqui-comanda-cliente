@@ -33,17 +33,23 @@ type CategoryTab = ProductCategory | 'Todos';
             ← Voltar ao mapa de comandas
           </button>
 
-          <div class="modal-title-row">
-            <h2 [id]="'comanda-modal-title-' + mesa.id">
-              Mesa {{ displayMesaNumber }} — {{ statusLabel }}
-            </h2>
-            <span
-              class="modal-status-badge"
-              [class.free]="!hasOpenComandas"
-              [class.reserved]="!hasOpenComandas && mesa.status === 'reservada'"
-            >
-              {{ statusBadge }}
-            </span>
+          <div class="modal-title-row modal-title-row-with-action">
+            <div class="modal-title-content">
+              <h2 [id]="'comanda-modal-title-' + mesa.id">
+                Mesa {{ displayMesaNumber }} — {{ statusLabel }}
+              </h2>
+              <span
+                class="modal-status-badge"
+                [class.free]="!hasOpenComandas"
+                [class.reserved]="!hasOpenComandas && mesa.status === 'reservada'"
+              >
+                {{ statusBadge }}
+              </span>
+            </div>
+
+            <button class="modal-primary-action modal-header-action" type="button" (click)="createForMesa.emit(mesa)">
+              Adicionar nova comanda
+            </button>
           </div>
 
           <p>
@@ -58,7 +64,7 @@ type CategoryTab = ProductCategory | 'Todos';
               <span>Para lançar itens, crie uma comanda e associe diretamente à Mesa {{ displayMesaNumber }}.</span>
             </div>
             <button class="modal-primary-action" type="button" (click)="createForMesa.emit(mesa)">
-              Criar comanda para esta mesa
+              Adicionar nova comanda
             </button>
           </section>
         } @else {
