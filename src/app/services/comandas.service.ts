@@ -49,26 +49,56 @@ export class ComandasService {
   }
 
   getComandasForMesa(mesaId: string): Comanda[] {
-    return this.comandas()
-      .filter((comanda) => comanda.mesaId === mesaId)
-      .sort((first, second) => {
-        const firstStatusWeight = this.isComandaAberta(first) ? 0 : 1;
-        const secondStatusWeight = this.isComandaAberta(second) ? 0 : 1;
+    return this.getComandasAtivasForMesa(mesaId).sort((first, second) => {
+      const firstStatusWeight = this.isComandaAberta(first) ? 0 : 1;
+      const secondStatusWeight = this.isComandaAberta(second) ? 0 : 1;
 
-        if (firstStatusWeight !== secondStatusWeight) {
-          return firstStatusWeight - secondStatusWeight;
-        }
+      if (firstStatusWeight !== secondStatusWeight) {
+        return firstStatusWeight - secondStatusWeight;
+      }
 
-        return new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime();
-      });
+      return new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime();
+    });
   }
 
   getOpenComandasForMesa(mesaId: string): Comanda[] {
-    return this.comandasAbertas().filter((comanda) => comanda.mesaId === mesaId);
+    return this.getComandasAtivasForMesa(mesaId).filter((comanda) => this.isComandaAberta(comanda));
   }
 
   getFinishedComandasForMesa(mesaId: string): Comanda[] {
-    return this.comandasFinalizadas().filter((comanda) => comanda.mesaId === mesaId);
+    return this.getComandasAtivasForMesa(mesaId).filter((comanda) =>
+      this.isComandaFinalizada(comanda),
+    );
+  }
+
+  getComandasAtivasForMesa(mesaId: string): Comanda[] {
+    return this.comandas().filter(
+      (comanda) => comanda.mesaId === mesaId && !comanda.mesaLiberadaEm,
+    );
+  }
+
+  canReleaseMesa(mesaId: string): boolean {
+    const comandas = this.getComandasAtivasForMesa(mesaId);
+
+    return comandas.length > 0 && comandas.every((comanda) => this.isComandaFinalizada(comanda));
+  }
+
+  releaseMesa(mesaId: string): boolean {
+    if (!this.canReleaseMesa(mesaId)) {
+      return false;
+    }
+
+    const releasedAt = new Date().toISOString();
+
+    this.comandas.set(
+      this.comandas().map((comanda) =>
+        comanda.mesaId === mesaId && !comanda.mesaLiberadaEm
+          ? { ...comanda, mesaLiberadaEm: releasedAt, updatedAt: releasedAt }
+          : comanda,
+      ),
+    );
+    this.persist();
+    return true;
   }
 
   getOpenComandaForMesa(mesaId: string): Comanda | null {
@@ -87,6 +117,7 @@ export class ComandasService {
     const comanda: Comanda = {
       id: `comanda-${mesaId ? `mesa-${mesaId}` : 'rapida'}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       mesaId,
+      mesaLiberadaEm: undefined,
       clienteId: payload.clienteId,
       clienteNome: payload.clienteNome,
       tipo: mesaId ? 'mesa' : 'avulsa',
@@ -124,6 +155,7 @@ export class ComandasService {
     const updatedComanda: Comanda = {
       ...existingComanda,
       mesaId,
+      mesaLiberadaEm: undefined,
       clienteId: payload.clienteId,
       clienteNome: payload.clienteNome,
       tipo: mesaId ? 'mesa' : 'avulsa',
@@ -137,9 +169,7 @@ export class ComandasService {
     };
 
     this.comandas.set(
-      this.comandas().map((comanda) =>
-        comanda.id === comandaId ? updatedComanda : comanda,
-      ),
+      this.comandas().map((comanda) => (comanda.id === comandaId ? updatedComanda : comanda)),
     );
     this.persist();
     return updatedComanda;
@@ -199,14 +229,14 @@ export class ComandasService {
     };
 
     this.comandas.set(
-      this.comandas().map((comanda) =>
-        comanda.id === comandaId ? finalizedComanda : comanda,
-      ),
+      this.comandas().map((comanda) => (comanda.id === comandaId ? finalizedComanda : comanda)),
     );
     this.persist();
 
     const mesa = finalizedComanda.mesaId
-      ? this.mesasService.getMesas().find((currentMesa) => currentMesa.id === finalizedComanda.mesaId) ?? null
+      ? (this.mesasService
+          .getMesas()
+          .find((currentMesa) => currentMesa.id === finalizedComanda.mesaId) ?? null)
       : null;
 
     this.caixaService.registrarEntradaComanda(finalizedComanda, mesa);
@@ -235,15 +265,21 @@ export class ComandasService {
   }
 
   getCardForMesa(mesa: Mesa): MapaMesaCard {
-    const comandas = this.getOpenComandasForMesa(mesa.id);
-    const total = comandas.reduce((sum, comanda) => sum + comanda.total, 0);
-    const hasComandas = comandas.length > 0;
+    const comandasAtivasDaMesa = this.getComandasAtivasForMesa(mesa.id);
+    const comandasAbertas = comandasAtivasDaMesa.filter((comanda) => this.isComandaAberta(comanda));
+    const total = comandasAbertas.reduce((sum, comanda) => sum + comanda.total, 0);
+    const hasComandasNoCicloAtual = comandasAtivasDaMesa.length > 0;
+    const mesaLiberacaoPendente =
+      hasComandasNoCicloAtual &&
+      comandasAtivasDaMesa.every((comanda) => this.isComandaFinalizada(comanda));
 
     return {
       mesa,
-      status: mesa.status === 'inativa' ? 'inativa' : hasComandas ? 'ocupada' : mesa.status,
+      status:
+        mesa.status === 'inativa' ? 'inativa' : hasComandasNoCicloAtual ? 'ocupada' : mesa.status,
       total,
-      totalComandas: comandas.length,
+      totalComandas: comandasAtivasDaMesa.length,
+      mesaLiberacaoPendente,
     };
   }
 
@@ -257,7 +293,8 @@ export class ComandasService {
     const totalAvulso = this.comandasAvulsas().reduce((total, comanda) => total + comanda.total, 0);
 
     return {
-      livres: activeCards.filter((card) => card.status === 'livre' || card.status === 'reservada').length,
+      livres: activeCards.filter((card) => card.status === 'livre' || card.status === 'reservada')
+        .length,
       ocupadas: activeCards.filter((card) => card.status === 'ocupada').length,
       totalEmConsumo: activeCards.reduce((total, card) => total + card.total, 0) + totalAvulso,
       totalMesas: activeCards.length,
@@ -283,20 +320,24 @@ export class ComandasService {
         const itens = this.normalizeItems(comanda.itens ?? []);
         const mesaId = comanda.mesaId || undefined;
         const rawStatus = String((comanda as Comanda & { status?: string }).status ?? 'aberta');
-        const isFinalizada = rawStatus === 'finalizada' || rawStatus === 'fechada' || Boolean(comanda.paga);
+        const isFinalizada =
+          rawStatus === 'finalizada' || rawStatus === 'fechada' || Boolean(comanda.paga);
         const total = this.getItemsTotal(itens);
         const status = isFinalizada ? 'finalizada' : 'aberta';
 
         return {
           ...comanda,
           mesaId,
+          mesaLiberadaEm: comanda.mesaLiberadaEm,
           tipo: mesaId ? 'mesa' : 'avulsa',
           status,
           paga: isFinalizada,
-          finalizadaEm: isFinalizada ? comanda.finalizadaEm ?? comanda.updatedAt ?? new Date().toISOString() : undefined,
-          totalFinalizado: isFinalizada ? comanda.totalFinalizado ?? total : undefined,
+          finalizadaEm: isFinalizada
+            ? (comanda.finalizadaEm ?? comanda.updatedAt ?? new Date().toISOString())
+            : undefined,
+          totalFinalizado: isFinalizada ? (comanda.totalFinalizado ?? total) : undefined,
           itens,
-          total: isFinalizada ? comanda.totalFinalizado ?? total : total,
+          total: isFinalizada ? (comanda.totalFinalizado ?? total) : total,
         };
       });
   }

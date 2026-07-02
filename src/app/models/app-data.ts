@@ -99,6 +99,7 @@ export interface EntradaCaixa {
 export interface Comanda {
   id: string;
   mesaId?: string;
+  mesaLiberadaEm?: string;
   clienteId?: string;
   clienteNome?: string;
   tipo?: ComandaTipo;
@@ -165,14 +166,10 @@ export interface MapaMesaCard {
   status: MapaMesaStatus;
   total: number;
   totalComandas: number;
+  mesaLiberacaoPendente?: boolean;
 }
 
-export const productCategories: ProductCategory[] = [
-  'Lanches',
-  'Bebidas',
-  'Porções',
-  'Sobremesas',
-];
+export const productCategories: ProductCategory[] = ['Lanches', 'Bebidas', 'Porções', 'Sobremesas'];
 
 export const telasSistema: TelaPermissaoConfig[] = [
   { tela: 'mapa', label: 'Dashboard / Mapa', path: '/mapa' },
