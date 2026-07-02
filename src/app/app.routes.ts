@@ -7,6 +7,7 @@ import { ConfiguracoesPageComponent } from './pages/configuracoes-page.component
 import { LoginPageComponent } from './pages/login-page.component';
 import { MapaComandasPageComponent } from './pages/mapa-comandas-page.component';
 import { MesasPageComponent } from './pages/mesas-page.component';
+import { PedidosPageComponent } from './pages/pedidos-page.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPageComponent },
@@ -19,7 +20,7 @@ export const routes: Routes = [
       { path: 'comandas', component: ConstructionPageComponent, data: { title: 'Comandas' } },
       { path: 'mesas', component: MesasPageComponent },
       { path: 'clientes', component: ClientesPageComponent },
-      { path: 'pedidos', component: ConstructionPageComponent, data: { title: 'Pedidos' } },
+      { path: 'pedidos', component: PedidosPageComponent },
       { path: 'caixa', component: ConstructionPageComponent, data: { title: 'Caixa' } },
       { path: 'cardapio', component: CardapioPageComponent },
       { path: 'relatorios', component: ConstructionPageComponent, data: { title: 'Relatórios' } },
