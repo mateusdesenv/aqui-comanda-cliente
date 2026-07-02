@@ -3,13 +3,14 @@ import { TelaSistema } from '../models/app-data';
 import type { IconName } from '../components/icon.component';
 
 export interface NavigationMenuItem {
-  id: TelaSistema;
+  id: string;
   label: string;
-  path: string;
+  path?: string;
   icon: IconName;
   tela: TelaSistema;
   disabled?: boolean;
   badge?: string;
+  children?: NavigationMenuItem[];
 }
 
 const MENU_ORDER_KEY = 'aqui-comanda:menu-order';
@@ -24,12 +25,33 @@ export const defaultMenuItems: NavigationMenuItem[] = [
   { id: 'caixa', label: 'Caixa', path: '/caixa', icon: 'register', tela: 'caixa' },
   { id: 'cardapio', label: 'Cardápio', path: '/cardapio', icon: 'cards', tela: 'cardapio' },
   { id: 'relatorios', label: 'Relatórios', path: '/relatorios', icon: 'file', tela: 'relatorios', disabled: true, badge: 'Em breve' },
-  { id: 'configuracoes', label: 'Configurações', path: '/configuracoes', icon: 'settings', tela: 'configuracoes' },
+  {
+    id: 'configuracoes',
+    label: 'Configurações',
+    icon: 'settings',
+    tela: 'configuracoes',
+    children: [
+      {
+        id: 'configuracoes-personalizacoes',
+        label: 'Personalizações do sistema',
+        path: '/configuracoes/personalizacoes',
+        icon: 'settings',
+        tela: 'configuracoes',
+      },
+      {
+        id: 'configuracoes-ordem-menu',
+        label: 'Ordem do menu',
+        path: '/configuracoes/ordem-menu',
+        icon: 'menu',
+        tela: 'configuracoes',
+      },
+    ],
+  },
 ];
 
 @Injectable({ providedIn: 'root' })
 export class MenuOrderService {
-  private readonly order = signal<TelaSistema[]>(this.readOrder());
+  private readonly order = signal<string[]>(this.readOrder());
 
   readonly menuItems = computed(() => this.applyOrder(defaultMenuItems, this.order()));
 
@@ -41,7 +63,7 @@ export class MenuOrderService {
     return [...this.menuItems()];
   }
 
-  saveOrder(order: TelaSistema[]): void {
+  saveOrder(order: string[]): void {
     const normalizedOrder = this.normalizeOrder(order);
     this.order.set(normalizedOrder);
     this.writeOrder(normalizedOrder);
@@ -55,7 +77,7 @@ export class MenuOrderService {
     }
   }
 
-  private applyOrder(menuItems: NavigationMenuItem[], order: TelaSistema[]): NavigationMenuItem[] {
+  private applyOrder(menuItems: NavigationMenuItem[], order: string[]): NavigationMenuItem[] {
     const validItems = new Map(menuItems.map((item) => [item.id, item]));
     const orderedItems = order
       .map((itemId) => validItems.get(itemId))
@@ -66,7 +88,7 @@ export class MenuOrderService {
     return [...orderedItems, ...newOrMissingItems];
   }
 
-  private readOrder(): TelaSistema[] {
+  private readOrder(): string[] {
     if (typeof localStorage === 'undefined') {
       return [];
     }
@@ -92,7 +114,7 @@ export class MenuOrderService {
     }
   }
 
-  private writeOrder(order: TelaSistema[]): void {
+  private writeOrder(order: string[]): void {
     if (typeof localStorage === 'undefined') {
       return;
     }
@@ -100,19 +122,17 @@ export class MenuOrderService {
     localStorage.setItem(MENU_ORDER_KEY, JSON.stringify(order));
   }
 
-  private normalizeOrder(order: unknown[]): TelaSistema[] {
+  private normalizeOrder(order: unknown[]): string[] {
     const validIds = new Set(defaultMenuItems.map((item) => item.id));
-    const normalizedOrder: TelaSistema[] = [];
+    const normalizedOrder: string[] = [];
 
     for (const itemId of order) {
-      if (typeof itemId !== 'string' || !validIds.has(itemId as TelaSistema)) {
+      if (typeof itemId !== 'string' || !validIds.has(itemId)) {
         continue;
       }
 
-      const tela = itemId as TelaSistema;
-
-      if (!normalizedOrder.includes(tela)) {
-        normalizedOrder.push(tela);
+      if (!normalizedOrder.includes(itemId)) {
+        normalizedOrder.push(itemId);
       }
     }
 

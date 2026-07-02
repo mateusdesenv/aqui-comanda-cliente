@@ -181,6 +181,6 @@ export const telasSistema: TelaPermissaoConfig[] = [
   { tela: 'caixa', label: 'Caixa', path: '/caixa' },
   { tela: 'cardapio', label: 'Cardápio / Produtos', path: '/cardapio' },
   { tela: 'relatorios', label: 'Relatórios', path: '/relatorios' },
-  { tela: 'configuracoes', label: 'Configurações', path: '/configuracoes' },
+  { tela: 'configuracoes', label: 'Configurações', path: '/configuracoes/personalizacoes' },
   { tela: 'colaboradores', label: 'Colaboradores', path: '/colaboradores' },
 ];

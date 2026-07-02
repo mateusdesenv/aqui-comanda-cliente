@@ -6,6 +6,7 @@ import { ClientesPageComponent } from './pages/clientes-page.component';
 import { ColaboradoresPageComponent } from './pages/colaboradores-page.component';
 import { ConstructionPageComponent } from './pages/construction-page.component';
 import { ConfiguracoesPageComponent } from './pages/configuracoes-page.component';
+import { OrdemMenuPageComponent } from './pages/ordem-menu-page.component';
 import { LoginPageComponent } from './pages/login-page.component';
 import { MapaComandasPageComponent } from './pages/mapa-comandas-page.component';
 import { MesasPageComponent } from './pages/mesas-page.component';
@@ -29,7 +30,9 @@ export const routes: Routes = [
       { path: 'caixa', component: CaixaPageComponent, canActivate: [permissionGuard], data: { tela: 'caixa' } },
       { path: 'cardapio', component: CardapioPageComponent, canActivate: [permissionGuard], data: { tela: 'cardapio' } },
       { path: 'relatorios', component: ConstructionPageComponent, canActivate: [permissionGuard], data: { tela: 'relatorios', title: 'Relatórios' } },
-      { path: 'configuracoes', component: ConfiguracoesPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes', pathMatch: 'full', redirectTo: 'configuracoes/personalizacoes' },
+      { path: 'configuracoes/personalizacoes', component: ConfiguracoesPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/ordem-menu', component: OrdemMenuPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
     ],
   },
   { path: '**', redirectTo: 'mapa' },
