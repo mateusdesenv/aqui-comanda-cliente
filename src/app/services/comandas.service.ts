@@ -212,6 +212,10 @@ export class ComandasService {
       return null;
     }
 
+    if (!this.caixaService.hasCaixaAberto()) {
+      return null;
+    }
+
     const itens = this.normalizeItems(existingComanda.itens ?? []);
 
     if (itens.length === 0) {

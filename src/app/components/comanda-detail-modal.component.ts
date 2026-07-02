@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Comanda, ItemComanda, Mesa, ProductCategory, Produto } from '../models/app-data';
 import { ComandasService } from '../services/comandas.service';
+import { CaixaService } from '../services/caixa.service';
 import { ProdutosService } from '../services/produtos.service';
 
 type CategoryTab = ProductCategory | 'Todos';
@@ -451,6 +452,7 @@ export class ComandaDetailModalComponent implements OnChanges {
   @Output() createForMesa = new EventEmitter<Mesa>();
 
   private readonly comandasService = inject(ComandasService);
+  private readonly caixaService = inject(CaixaService);
   private readonly produtosService = inject(ProdutosService);
 
   protected activeCategory: CategoryTab = 'Todos';
@@ -752,6 +754,12 @@ export class ComandaDetailModalComponent implements OnChanges {
 
   protected confirmFinishComanda(): void {
     if (!this.finishCandidate || !this.canWrite) {
+      return;
+    }
+
+    if (!this.caixaService.hasCaixaAberto()) {
+      this.finishCandidate = null;
+      this.modalFeedback = 'Abra o caixa antes de registrar pagamentos.';
       return;
     }
 

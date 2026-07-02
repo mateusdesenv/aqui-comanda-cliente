@@ -6,6 +6,8 @@ import { ClientesPageComponent } from './pages/clientes-page.component';
 import { ColaboradoresPageComponent } from './pages/colaboradores-page.component';
 import { ConstructionPageComponent } from './pages/construction-page.component';
 import { ConfiguracoesPageComponent } from './pages/configuracoes-page.component';
+import { FiliaisPageComponent } from './pages/filiais-page.component';
+import { ImportarExportarPageComponent } from './pages/importar-exportar-page.component';
 import { OrdemMenuPageComponent } from './pages/ordem-menu-page.component';
 import { LoginPageComponent } from './pages/login-page.component';
 import { MapaComandasPageComponent } from './pages/mapa-comandas-page.component';
@@ -33,6 +35,8 @@ export const routes: Routes = [
       { path: 'configuracoes', pathMatch: 'full', redirectTo: 'configuracoes/personalizacoes' },
       { path: 'configuracoes/personalizacoes', component: ConfiguracoesPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
       { path: 'configuracoes/ordem-menu', component: OrdemMenuPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/filiais', component: FiliaisPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/importar-exportar', component: ImportarExportarPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
     ],
   },
   { path: '**', redirectTo: 'mapa' },

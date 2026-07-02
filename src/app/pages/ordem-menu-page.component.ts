@@ -1,12 +1,13 @@
 import { Component, inject, signal } from '@angular/core';
 import { IconComponent } from '../components/icon.component';
+import { ConfirmationModalComponent } from '../components/confirmation-modal.component';
 import { AuthService } from '../services/auth.service';
 import { MenuOrderService, NavigationMenuItem } from '../services/menu-order.service';
 
 @Component({
   selector: 'app-ordem-menu-page',
   standalone: true,
-  imports: [IconComponent],
+  imports: [IconComponent, ConfirmationModalComponent],
   template: `
     <div class="page-stack settings-page">
       <section class="page-head">
@@ -83,6 +84,17 @@ import { MenuOrderService, NavigationMenuItem } from '../services/menu-order.ser
           </div>
         }
       </section>
+
+      @if (restoreConfirmationOpen()) {
+        <app-confirmation-modal
+          title="Restaurar ordem padrão?"
+          description="Essa ação vai desfazer a ordem personalizada do menu e restaurar a organização original do sistema."
+          confirmLabel="Restaurar padrão"
+          cancelLabel="Cancelar"
+          (confirm)="confirmRestoreDefaultOrder()"
+          (cancel)="cancelRestoreDefaultOrder()"
+        />
+      }
     </div>
   `,
 })
@@ -94,6 +106,7 @@ export class OrdemMenuPageComponent {
   protected readonly draggingIndex = signal<number | null>(null);
   protected readonly dragOverIndex = signal<number | null>(null);
   protected readonly menuOrderMessage = signal('');
+  protected readonly restoreConfirmationOpen = signal(false);
 
   protected canConfigureMenu(): boolean {
     return this.authService.canWrite('configuracoes');
@@ -180,14 +193,22 @@ export class OrdemMenuPageComponent {
       return;
     }
 
-    const shouldRestore = typeof window === 'undefined' || window.confirm('Restaurar a ordem padrão do menu?');
+    this.menuOrderMessage.set('');
+    this.restoreConfirmationOpen.set(true);
+  }
 
-    if (!shouldRestore) {
+  protected cancelRestoreDefaultOrder(): void {
+    this.restoreConfirmationOpen.set(false);
+  }
+
+  protected confirmRestoreDefaultOrder(): void {
+    if (!this.canConfigureMenu()) {
       return;
     }
 
     this.menuOrderService.restoreDefaultOrder();
     this.menuItems.set(this.getConfigurableMenuItems());
+    this.restoreConfirmationOpen.set(false);
     this.menuOrderMessage.set('Ordem padrão restaurada.');
   }
 

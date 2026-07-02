@@ -45,6 +45,20 @@ export const defaultMenuItems: NavigationMenuItem[] = [
         icon: 'menu',
         tela: 'configuracoes',
       },
+      {
+        id: 'configuracoes-filiais',
+        label: 'Lojas / Filiais',
+        path: '/configuracoes/filiais',
+        icon: 'settings',
+        tela: 'configuracoes',
+      },
+      {
+        id: 'configuracoes-importar-exportar',
+        label: 'Importar / Exportar',
+        path: '/configuracoes/importar-exportar',
+        icon: 'file',
+        tela: 'configuracoes',
+      },
     ],
   },
 ];

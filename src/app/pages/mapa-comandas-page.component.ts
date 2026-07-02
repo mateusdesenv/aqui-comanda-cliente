@@ -8,6 +8,7 @@ import { IconComponent } from '../components/icon.component';
 import { StatCardComponent } from '../components/stat-card.component';
 import { Comanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
 import { ComandasService } from '../services/comandas.service';
+import { CaixaService } from '../services/caixa.service';
 import { MesasService } from '../services/mesas.service';
 import { AuthService } from '../services/auth.service';
 
@@ -172,6 +173,7 @@ import { AuthService } from '../services/auth.service';
 })
 export class MapaComandasPageComponent {
   private readonly comandasService = inject(ComandasService);
+  private readonly caixaService = inject(CaixaService);
   private readonly mesasService = inject(MesasService);
   private readonly authService = inject(AuthService);
 
@@ -291,6 +293,12 @@ export class MapaComandasPageComponent {
 
   protected confirmQuickFinishComanda(): void {
     if (!this.quickFinishCandidate || !this.ensureCanWrite()) {
+      return;
+    }
+
+    if (!this.caixaService.hasCaixaAberto()) {
+      this.quickFinishCandidate = null;
+      this.feedbackMessage = 'Abra o caixa antes de registrar pagamentos.';
       return;
     }
 
