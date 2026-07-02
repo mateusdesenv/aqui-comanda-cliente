@@ -1,47 +1,99 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Comanda, ItemComanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
+import { CaixaService } from './caixa.service';
 import { LocalStorageRepository } from './local-storage.repository';
+import { MesasService } from './mesas.service';
+
+interface SaveComandaPayload {
+  clienteId: string;
+  clienteNome: string;
+  items: ItemComanda[];
+  mesaId?: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ComandasService {
+  private readonly caixaService = inject(CaixaService);
+  private readonly mesasService = inject(MesasService);
+
   private readonly repository = new LocalStorageRepository<Comanda[]>(
     'aqui-comanda:open-comandas',
-    this.createDefaultComandas(),
+    [],
   );
 
   readonly comandas = signal<Comanda[]>(this.normalizeComandas(this.repository.read()));
-  readonly comandasAbertas = computed(() => this.comandas().filter((comanda) => comanda.status === 'aberta'));
+  readonly comandasAbertas = computed(() =>
+    this.comandas().filter((comanda) => this.isComandaAberta(comanda)),
+  );
+  readonly comandasFinalizadas = computed(() =>
+    this.comandas().filter((comanda) => this.isComandaFinalizada(comanda)),
+  );
+  readonly comandasAvulsas = computed(() =>
+    this.comandasAbertas().filter((comanda) => !comanda.mesaId),
+  );
 
   constructor() {
     this.persist();
   }
 
   getComandas(): Comanda[] {
+    return this.comandas();
+  }
+
+  getOpenComandas(): Comanda[] {
     return this.comandasAbertas();
   }
 
+  getQuickComandas(): Comanda[] {
+    return this.comandasAvulsas();
+  }
+
+  getComandasForMesa(mesaId: string): Comanda[] {
+    return this.comandas()
+      .filter((comanda) => comanda.mesaId === mesaId)
+      .sort((first, second) => {
+        const firstStatusWeight = this.isComandaAberta(first) ? 0 : 1;
+        const secondStatusWeight = this.isComandaAberta(second) ? 0 : 1;
+
+        if (firstStatusWeight !== secondStatusWeight) {
+          return firstStatusWeight - secondStatusWeight;
+        }
+
+        return new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime();
+      });
+  }
+
+  getOpenComandasForMesa(mesaId: string): Comanda[] {
+    return this.comandasAbertas().filter((comanda) => comanda.mesaId === mesaId);
+  }
+
+  getFinishedComandasForMesa(mesaId: string): Comanda[] {
+    return this.comandasFinalizadas().filter((comanda) => comanda.mesaId === mesaId);
+  }
+
   getOpenComandaForMesa(mesaId: string): Comanda | null {
-    return this.comandasAbertas().find((comanda) => comanda.mesaId === mesaId) ?? null;
+    return this.getOpenComandasForMesa(mesaId)[0] ?? null;
   }
 
   getItemsForMesa(mesa: Mesa): ItemComanda[] {
-    return this.getOpenComandaForMesa(mesa.id)?.itens ?? [];
+    return this.getOpenComandasForMesa(mesa.id).flatMap((comanda) => comanda.itens);
   }
 
-  prepareComandaForMesa(mesa: Mesa): Comanda {
-    const existingComanda = this.getOpenComandaForMesa(mesa.id);
-
-    if (existingComanda) {
-      return existingComanda;
-    }
-
+  createComanda(payload: SaveComandaPayload): Comanda {
     const now = new Date().toISOString();
+    const updatedItems = this.normalizeItems(payload.items);
+    const mesaId = payload.mesaId || undefined;
+
     const comanda: Comanda = {
-      id: `comanda-${mesa.id}-${Date.now()}`,
-      mesaId: mesa.id,
+      id: `comanda-${mesaId ? `mesa-${mesaId}` : 'rapida'}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      mesaId,
+      clienteId: payload.clienteId,
+      clienteNome: payload.clienteNome,
+      tipo: mesaId ? 'mesa' : 'avulsa',
       status: 'aberta',
-      itens: [],
-      total: 0,
+      paga: false,
+      itens: updatedItems,
+      total: this.getItemsTotal(updatedItems),
       createdAt: now,
       updatedAt: now,
     };
@@ -51,43 +103,147 @@ export class ComandasService {
     return comanda;
   }
 
-  saveItemsForMesa(mesa: Mesa, items: ItemComanda[]): void {
-    if (items.length === 0) {
-      this.closeComandaForMesa(mesa.id);
-      return;
+  createQuickComanda(
+    clienteId: string,
+    clienteNome: string,
+    items: ItemComanda[],
+    mesaId?: string,
+  ): Comanda {
+    return this.createComanda({ clienteId, clienteNome, items, mesaId });
+  }
+
+  updateComanda(comandaId: string, payload: SaveComandaPayload): Comanda | null {
+    const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
+      return null;
     }
 
-    const comanda = this.prepareComandaForMesa(mesa);
-    const updatedItems = items.map((item) => ({
-      ...item,
-      subtotal: item.quantidade * item.precoUnitario,
-    }));
+    const mesaId = payload.mesaId || undefined;
+    const updatedItems = this.normalizeItems(payload.items);
+    const updatedComanda: Comanda = {
+      ...existingComanda,
+      mesaId,
+      clienteId: payload.clienteId,
+      clienteNome: payload.clienteNome,
+      tipo: mesaId ? 'mesa' : 'avulsa',
+      status: 'aberta',
+      paga: false,
+      finalizadaEm: undefined,
+      totalFinalizado: undefined,
+      itens: updatedItems,
+      total: this.getItemsTotal(updatedItems),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.comandas.set(
+      this.comandas().map((comanda) =>
+        comanda.id === comandaId ? updatedComanda : comanda,
+      ),
+    );
+    this.persist();
+    return updatedComanda;
+  }
+
+  saveItemsForComanda(comandaId: string, items: ItemComanda[]): boolean {
+    const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
+      return false;
+    }
+
+    if (items.length === 0) {
+      this.removeOpenComandaById(comandaId);
+      return true;
+    }
+
+    const updatedItems = this.normalizeItems(items);
     const total = this.getItemsTotal(updatedItems);
     const updatedAt = new Date().toISOString();
 
     this.comandas.set(
       this.comandas().map((currentComanda) =>
-        currentComanda.id === comanda.id
+        currentComanda.id === comandaId
           ? { ...currentComanda, itens: updatedItems, total, updatedAt }
           : currentComanda,
       ),
     );
     this.persist();
+    return true;
+  }
+
+  finalizeComandaById(comandaId: string): Comanda | null {
+    const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
+      return null;
+    }
+
+    const itens = this.normalizeItems(existingComanda.itens ?? []);
+
+    if (itens.length === 0) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const totalFinalizado = this.getItemsTotal(itens);
+    const finalizedComanda: Comanda = {
+      ...existingComanda,
+      status: 'finalizada',
+      paga: true,
+      finalizadaEm: now,
+      totalFinalizado,
+      itens,
+      total: totalFinalizado,
+      updatedAt: now,
+    };
+
+    this.comandas.set(
+      this.comandas().map((comanda) =>
+        comanda.id === comandaId ? finalizedComanda : comanda,
+      ),
+    );
+    this.persist();
+
+    const mesa = finalizedComanda.mesaId
+      ? this.mesasService.getMesas().find((currentMesa) => currentMesa.id === finalizedComanda.mesaId) ?? null
+      : null;
+
+    this.caixaService.registrarEntradaComanda(finalizedComanda, mesa);
+    return finalizedComanda;
   }
 
   closeComandaForMesa(mesaId: string): void {
-    this.comandas.set(this.comandas().filter((comanda) => comanda.mesaId !== mesaId));
+    this.getOpenComandasForMesa(mesaId).forEach((comanda) => {
+      this.finalizeComandaById(comanda.id);
+    });
+  }
+
+  closeComandaById(comandaId: string): void {
+    this.finalizeComandaById(comandaId);
+  }
+
+  removeOpenComandaById(comandaId: string): void {
+    const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
+      return;
+    }
+
+    this.comandas.set(this.comandas().filter((comanda) => comanda.id !== comandaId));
     this.persist();
   }
 
   getCardForMesa(mesa: Mesa): MapaMesaCard {
-    const comanda = this.getOpenComandaForMesa(mesa.id);
-    const hasConsumo = Boolean(comanda && comanda.total > 0);
+    const comandas = this.getOpenComandasForMesa(mesa.id);
+    const total = comandas.reduce((sum, comanda) => sum + comanda.total, 0);
+    const hasComandas = comandas.length > 0;
 
     return {
       mesa,
-      status: mesa.status === 'inativa' ? 'inativa' : hasConsumo ? 'ocupada' : mesa.status,
-      total: comanda?.total ?? 0,
+      status: mesa.status === 'inativa' ? 'inativa' : hasComandas ? 'ocupada' : mesa.status,
+      total,
+      totalComandas: comandas.length,
     };
   }
 
@@ -98,13 +254,22 @@ export class ComandasService {
   getResumoForMesas(mesas: Mesa[]): ResumoComandas {
     const cards = this.getCardsForMesas(mesas);
     const activeCards = cards.filter((card) => card.status !== 'inativa');
+    const totalAvulso = this.comandasAvulsas().reduce((total, comanda) => total + comanda.total, 0);
 
     return {
       livres: activeCards.filter((card) => card.status === 'livre' || card.status === 'reservada').length,
       ocupadas: activeCards.filter((card) => card.status === 'ocupada').length,
-      totalEmConsumo: activeCards.reduce((total, card) => total + card.total, 0),
+      totalEmConsumo: activeCards.reduce((total, card) => total + card.total, 0) + totalAvulso,
       totalMesas: activeCards.length,
     };
+  }
+
+  isComandaAberta(comanda: Comanda): boolean {
+    return comanda.status === 'aberta' && !comanda.paga;
+  }
+
+  isComandaFinalizada(comanda: Comanda): boolean {
+    return comanda.status === 'finalizada' || comanda.paga;
   }
 
   private persist(): void {
@@ -113,61 +278,39 @@ export class ComandasService {
 
   private normalizeComandas(comandas: Comanda[]): Comanda[] {
     return comandas
-      .filter((comanda) => Boolean(comanda.mesaId))
+      .filter((comanda) => comanda.id !== 'comanda-mesa-02')
       .map((comanda) => {
-        const itens = (comanda.itens ?? []).map((item) => ({
-          ...item,
-          precoUnitario: item.precoUnitario ?? 0,
-          subtotal: item.subtotal ?? item.quantidade * (item.precoUnitario ?? 0),
-        }));
+        const itens = this.normalizeItems(comanda.itens ?? []);
+        const mesaId = comanda.mesaId || undefined;
+        const rawStatus = String((comanda as Comanda & { status?: string }).status ?? 'aberta');
+        const isFinalizada = rawStatus === 'finalizada' || rawStatus === 'fechada' || Boolean(comanda.paga);
+        const total = this.getItemsTotal(itens);
+        const status = isFinalizada ? 'finalizada' : 'aberta';
 
         return {
           ...comanda,
-          status: 'aberta',
+          mesaId,
+          tipo: mesaId ? 'mesa' : 'avulsa',
+          status,
+          paga: isFinalizada,
+          finalizadaEm: isFinalizada ? comanda.finalizadaEm ?? comanda.updatedAt ?? new Date().toISOString() : undefined,
+          totalFinalizado: isFinalizada ? comanda.totalFinalizado ?? total : undefined,
           itens,
-          total: this.getItemsTotal(itens),
+          total: isFinalizada ? comanda.totalFinalizado ?? total : total,
         };
       });
   }
 
+  private normalizeItems(items: ItemComanda[]): ItemComanda[] {
+    return items.map((item) => ({
+      ...item,
+      precoUnitario: item.precoUnitario ?? 0,
+      quantidade: item.quantidade ?? 0,
+      subtotal: (item.quantidade ?? 0) * (item.precoUnitario ?? 0),
+    }));
+  }
+
   private getItemsTotal(items: ItemComanda[]): number {
     return items.reduce((total, item) => total + item.subtotal, 0);
-  }
-
-  private createDefaultComandas(): Comanda[] {
-    const now = new Date().toISOString();
-    const itens: ItemComanda[] = [
-      this.createItem('x-burger', 'X-Burger', 2, 24.9),
-      this.createItem('batata-frita', 'Batata Frita', 1, 16.9),
-      this.createItem('refrigerante-lata', 'Refrigerante Lata', 2, 7.5),
-    ];
-
-    return [
-      {
-        id: 'comanda-mesa-02',
-        mesaId: 'mesa-02',
-        status: 'aberta',
-        itens,
-        total: this.getItemsTotal(itens),
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
-  }
-
-  private createItem(
-    productId: string,
-    nome: string,
-    quantidade: number,
-    precoUnitario: number,
-  ): ItemComanda {
-    return {
-      id: `${productId}-${quantidade}-${precoUnitario}`,
-      productId,
-      nome,
-      quantidade,
-      precoUnitario,
-      subtotal: quantidade * precoUnitario,
-    };
   }
 }

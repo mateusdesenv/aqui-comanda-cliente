@@ -1,4 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 import { IconComponent } from './icon.component';
 
 @Component({
@@ -19,11 +21,11 @@ import { IconComponent } from './icon.component';
         </label>
 
         <button class="topbar-button" type="button">
-          <app-icon name="menu" [size]="22" />
-          <span>Menu</span>
+          <app-icon name="users" [size]="22" />
+          <span>{{ authService.currentUser()?.usuario || 'Usuário' }}</span>
         </button>
 
-        <button class="topbar-button" type="button">
+        <button class="topbar-button" type="button" (click)="logout()">
           <app-icon name="logout" [size]="22" />
           <span>Sair</span>
         </button>
@@ -31,4 +33,12 @@ import { IconComponent } from './icon.component';
     </header>
   `,
 })
-export class HeaderComponent {}
+export class HeaderComponent {
+  protected readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+
+  protected logout(): void {
+    this.authService.logout();
+    this.router.navigateByUrl('/login');
+  }
+}

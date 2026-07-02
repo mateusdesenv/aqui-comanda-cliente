@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth.service';
 import { Mesa, MesaStatus } from '../models/app-data';
 import { MesaPayload, MesasService } from '../services/mesas.service';
 
@@ -88,7 +89,7 @@ interface MesaFormModel {
             <div class="form-feedback">{{ errorMessage }}</div>
           }
 
-          <button class="primary-action-button" type="submit">
+          <button class="primary-action-button" type="submit" [disabled]="!canWriteMesas">
             {{ editingMesaId ? 'Salvar alterações' : 'Cadastrar mesa' }}
           </button>
         </form>
@@ -119,8 +120,12 @@ interface MesaFormModel {
                 <span>{{ mesa.capacidade || '-' }}</span>
                 <span>{{ mesa.observacao || '-' }}</span>
                 <div class="row-actions">
-                  <button type="button" (click)="editMesa(mesa)">Editar</button>
-                  <button class="danger" type="button" (click)="deleteMesa(mesa)">Excluir</button>
+                  @if (canWriteMesas) {
+                    <button type="button" (click)="editMesa(mesa)">Editar</button>
+                    <button class="danger" type="button" (click)="deleteMesa(mesa)">Excluir</button>
+                  } @else {
+                    <span class="readonly-chip">Somente leitura</span>
+                  }
                 </div>
               </div>
             } @empty {
@@ -137,14 +142,24 @@ interface MesaFormModel {
 })
 export class MesasPageComponent {
   private readonly mesasService = inject(MesasService);
+  private readonly authService = inject(AuthService);
 
   protected readonly statusOptions: MesaStatus[] = ['livre', 'reservada', 'inativa'];
+  protected get canWriteMesas(): boolean {
+    return this.authService.canWrite('mesas');
+  }
+
   protected mesas = this.mesasService.getMesas();
   protected editingMesaId: string | null = null;
   protected errorMessage = '';
   protected form: MesaFormModel = this.createEmptyForm();
 
   protected saveMesa(): void {
+    if (!this.canWriteMesas) {
+      this.errorMessage = 'Você não tem permissão de escrita em Mesas.';
+      return;
+    }
+
     this.errorMessage = '';
 
     if (!this.form.numero || this.form.numero < 1) {
@@ -180,6 +195,11 @@ export class MesasPageComponent {
   }
 
   protected editMesa(mesa: Mesa): void {
+    if (!this.canWriteMesas) {
+      this.errorMessage = 'Você não tem permissão para editar mesas.';
+      return;
+    }
+
     this.errorMessage = '';
     this.editingMesaId = mesa.id;
     this.form = {
@@ -192,6 +212,11 @@ export class MesasPageComponent {
   }
 
   protected deleteMesa(mesa: Mesa): void {
+    if (!this.canWriteMesas) {
+      this.errorMessage = 'Você não tem permissão para excluir mesas.';
+      return;
+    }
+
     if (this.editingMesaId === mesa.id) {
       this.resetForm();
     }

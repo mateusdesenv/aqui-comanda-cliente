@@ -1,11 +1,16 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { TelaSistema } from '../models/app-data';
+import { AuthService } from '../services/auth.service';
 import { IconComponent, IconName } from './icon.component';
 
 interface MenuItem {
   label: string;
   path: string;
   icon: IconName;
+  tela: TelaSistema;
+  disabled?: boolean;
+  badge?: string;
 }
 
 @Component({
@@ -19,18 +24,36 @@ interface MenuItem {
       </div>
 
       <nav class="sidebar-nav">
-        @for (item of menuItems; track item.path) {
-          <a
-            [routerLink]="item.path"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="sidebar-link"
-          >
-            <span class="sidebar-link-icon">
-              <app-icon [name]="item.icon" [size]="24" />
-            </span>
-            <span>{{ item.label }}</span>
-          </a>
+        @for (item of visibleMenuItems; track item.path) {
+          @if (item.disabled) {
+            <button
+              type="button"
+              class="sidebar-link sidebar-link-disabled"
+              disabled
+              aria-disabled="true"
+              [attr.title]="item.badge || 'Tela em construção'"
+            >
+              <span class="sidebar-link-icon">
+                <app-icon [name]="item.icon" [size]="24" />
+              </span>
+              <span class="sidebar-link-label">{{ item.label }}</span>
+              @if (item.badge) {
+                <span class="sidebar-link-badge">{{ item.badge }}</span>
+              }
+            </button>
+          } @else {
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: true }"
+              class="sidebar-link"
+            >
+              <span class="sidebar-link-icon">
+                <app-icon [name]="item.icon" [size]="24" />
+              </span>
+              <span class="sidebar-link-label">{{ item.label }}</span>
+            </a>
+          }
         }
       </nav>
 
@@ -39,22 +62,30 @@ interface MenuItem {
           <app-icon name="shield" [size]="26" />
         </span>
         <div>
-          <strong>Seguro. Simples. Completo.</strong>
-          <p>Pensado para o dia a dia do seu negócio.</p>
+          <strong>{{ authService.currentUser()?.nome || 'Usuário' }}</strong>
+          <p>{{ authService.currentUser()?.nivel === 'admin' ? 'Acesso administrador' : 'Acesso por permissão' }}</p>
         </div>
       </div>
     </aside>
   `,
 })
 export class SidebarComponent {
-  protected readonly menuItems: MenuItem[] = [
-    { label: 'Mapa de Comandas', path: '/mapa', icon: 'commandMap' },
-    { label: 'Comandas', path: '/comandas', icon: 'receipt' },
-    { label: 'Mesas', path: '/mesas', icon: 'table' },
-    { label: 'Pedidos', path: '/pedidos', icon: 'bell' },
-    { label: 'Caixa', path: '/caixa', icon: 'register' },
-    { label: 'Cardápio', path: '/cardapio', icon: 'cards' },
-    { label: 'Relatórios', path: '/relatorios', icon: 'file' },
-    { label: 'Configurações', path: '/configuracoes', icon: 'settings' },
+  protected readonly authService = inject(AuthService);
+
+  private readonly menuItems: MenuItem[] = [
+    { label: 'Mapa de Comandas', path: '/mapa', icon: 'commandMap', tela: 'mapa' },
+    { label: 'Comandas', path: '/comandas', icon: 'receipt', tela: 'comandas', disabled: true, badge: 'Em breve' },
+    { label: 'Mesas', path: '/mesas', icon: 'table', tela: 'mesas' },
+    { label: 'Clientes', path: '/clientes', icon: 'users', tela: 'clientes' },
+    { label: 'Pedidos', path: '/pedidos', icon: 'bell', tela: 'pedidos' },
+    { label: 'Colaboradores', path: '/colaboradores', icon: 'shield', tela: 'colaboradores' },
+    { label: 'Caixa', path: '/caixa', icon: 'register', tela: 'caixa' },
+    { label: 'Cardápio', path: '/cardapio', icon: 'cards', tela: 'cardapio' },
+    { label: 'Relatórios', path: '/relatorios', icon: 'file', tela: 'relatorios', disabled: true, badge: 'Em breve' },
+    { label: 'Configurações', path: '/configuracoes', icon: 'settings', tela: 'configuracoes' },
   ];
+
+  protected get visibleMenuItems(): MenuItem[] {
+    return this.menuItems.filter((item) => this.authService.canRead(item.tela));
+  }
 }

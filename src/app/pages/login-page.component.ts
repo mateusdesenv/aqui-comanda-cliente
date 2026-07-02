@@ -1,5 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { IconComponent, IconName } from '../components/icon.component';
+import { AuthService } from '../services/auth.service';
 
 interface Feature {
   title: string;
@@ -16,7 +19,7 @@ interface PreviewTable {
 @Component({
   selector: 'app-login-page',
   standalone: true,
-  imports: [IconComponent],
+  imports: [FormsModule, IconComponent],
   template: `
     <main class="login-page">
       <section class="brand-panel" aria-label="Apresentação do Aqui Comanda">
@@ -104,7 +107,7 @@ interface PreviewTable {
         <div class="ambient ambient-one"></div>
         <div class="ambient ambient-two"></div>
 
-        <section class="login-card" aria-labelledby="login-title">
+        <form class="login-card" aria-labelledby="login-title" (ngSubmit)="login()">
           <div class="mobile-logo">
             <img src="assets/logo.png" alt="Aqui Comanda" />
           </div>
@@ -117,21 +120,39 @@ interface PreviewTable {
           <p>Acesse o painel operacional do Aqui Comanda.</p>
 
           <div class="login-fields">
-            <label for="email">E-mail</label>
+            <label for="usuario">Usuário</label>
             <div class="input-control">
-              <app-icon name="mail" />
-              <input id="email" type="email" placeholder="seu@email.com" autocomplete="email" />
+              <app-icon name="users" />
+              <input
+                id="usuario"
+                name="usuario"
+                type="text"
+                placeholder="admin"
+                autocomplete="username"
+                [(ngModel)]="usuario"
+              />
             </div>
 
             <label for="password">Senha</label>
             <div class="input-control">
               <app-icon name="lock" />
-              <input id="password" type="password" placeholder="Digite sua senha" autocomplete="current-password" />
+              <input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="admin"
+                autocomplete="current-password"
+                [(ngModel)]="senha"
+              />
               <span class="input-action">
                 <app-icon name="eye" />
               </span>
             </div>
           </div>
+
+          @if (errorMessage) {
+            <div class="form-feedback login-feedback">{{ errorMessage }}</div>
+          }
 
           <div class="form-options">
             <label class="remember-option" for="remember">
@@ -142,19 +163,19 @@ interface PreviewTable {
             <a href="#forgot-password" (click)="$event.preventDefault()">Esqueci minha senha</a>
           </div>
 
-          <button class="primary-button" type="button">Entrar</button>
+          <button class="primary-button" type="submit">Entrar</button>
 
           <div class="divider">
             <span></span>
-            <small>ou</small>
+            <small>acesso padrão</small>
             <span></span>
           </div>
 
-          <button class="google-button" type="button">
-            <app-icon name="google" />
-            <span>Entrar com Google</span>
+          <button class="google-button" type="button" disabled>
+            <app-icon name="shield" />
+            <span>admin / admin</span>
           </button>
-        </section>
+        </form>
 
         <div class="protected-note">
           <app-icon name="lock" />
@@ -165,6 +186,13 @@ interface PreviewTable {
   `,
 })
 export class LoginPageComponent {
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+
+  protected usuario = 'admin';
+  protected senha = 'admin';
+  protected errorMessage = '';
+
   protected readonly features: Feature[] = [
     { title: 'Comandas', description: 'Abertura e acompanhamento em tempo real', icon: 'receipt' },
     { title: 'Mesas', description: 'Visualize mesas, status e ocupação', icon: 'table' },
@@ -180,4 +208,22 @@ export class LoginPageComponent {
     { number: '05', status: 'Aberta', variant: 'warning' },
     { number: '06', status: 'Fechando', variant: 'muted' },
   ];
+
+  protected login(): void {
+    this.errorMessage = '';
+
+    if (!this.usuario.trim() || !this.senha.trim()) {
+      this.errorMessage = 'Informe usuário e senha.';
+      return;
+    }
+
+    const logged = this.authService.login(this.usuario, this.senha);
+
+    if (!logged) {
+      this.errorMessage = 'Usuário, senha ou status inválido.';
+      return;
+    }
+
+    this.router.navigateByUrl(this.authService.getFirstAllowedPath());
+  }
 }
