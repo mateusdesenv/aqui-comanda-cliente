@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, HostListener, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { Cliente } from '../models/app-data';
@@ -55,10 +55,28 @@ interface ClienteFormModel {
               <span>{{ cliente.cpf }}</span>
               <span>{{ formatDate(cliente.dataNascimento) }}</span>
               <span>{{ cliente.endereco || '-' }}</span>
-              <div class="row-actions">
+              <div class="row-actions client-more-actions" (click)="$event.stopPropagation()">
                 @if (canWriteClientes) {
-                  <button type="button" (click)="editCliente(cliente)">Editar</button>
-                  <button class="danger" type="button" (click)="deleteCliente(cliente)">Excluir</button>
+                  <button
+                    class="more-actions-button"
+                    type="button"
+                    [attr.aria-label]="'Abrir ações de ' + cliente.nome"
+                    [attr.aria-expanded]="openedActionMenuClienteId === cliente.id"
+                    (click)="toggleClienteActions(cliente.id, $event)"
+                  >
+                    ⋮
+                  </button>
+
+                  @if (openedActionMenuClienteId === cliente.id) {
+                    <div class="row-actions-popup" role="menu">
+                      <button type="button" role="menuitem" (click)="handleEditCliente(cliente)">
+                        Editar
+                      </button>
+                      <button class="danger" type="button" role="menuitem" (click)="handleDeleteCliente(cliente)">
+                        Excluir
+                      </button>
+                    </div>
+                  }
                 } @else {
                   <span class="readonly-chip">Somente leitura</span>
                 }
@@ -173,7 +191,13 @@ export class ClientesPageComponent {
   protected clienteModalOpen = false;
   protected errorMessage = '';
   protected successMessage = '';
+  protected openedActionMenuClienteId: string | null = null;
   protected form: ClienteFormModel = this.createEmptyForm();
+
+  @HostListener('document:click')
+  protected closeActionMenus(): void {
+    this.openedActionMenuClienteId = null;
+  }
 
   protected openCreateModal(): void {
     if (!this.canWriteClientes) {
@@ -181,6 +205,7 @@ export class ClientesPageComponent {
       return;
     }
 
+    this.openedActionMenuClienteId = null;
     this.editingClienteId = null;
     this.form = this.createEmptyForm();
     this.errorMessage = '';
@@ -189,9 +214,26 @@ export class ClientesPageComponent {
   }
 
   protected closeModal(): void {
+    this.openedActionMenuClienteId = null;
     this.clienteModalOpen = false;
     this.resetForm();
   }
+
+  protected toggleClienteActions(clienteId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.openedActionMenuClienteId = this.openedActionMenuClienteId === clienteId ? null : clienteId;
+  }
+
+  protected handleEditCliente(cliente: Cliente): void {
+    this.openedActionMenuClienteId = null;
+    this.editCliente(cliente);
+  }
+
+  protected handleDeleteCliente(cliente: Cliente): void {
+    this.openedActionMenuClienteId = null;
+    this.deleteCliente(cliente);
+  }
+
 
   protected saveCliente(): void {
     if (!this.canWriteClientes) {

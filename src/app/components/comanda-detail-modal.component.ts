@@ -96,7 +96,10 @@ type MenuViewMode = 'grid' | 'lista';
                   </span>
                 </div>
 
-                <span class="mesa-comanda-client">{{
+                <span
+                  class="mesa-comanda-client"
+                  [class.registered-client-name]="isRegisteredClienteComanda(comanda)"
+                >{{
                   comanda.clienteNome || 'Cliente não informado'
                 }}</span>
 
@@ -268,7 +271,7 @@ type MenuViewMode = 'grid' | 'lista';
 
               <div class="order-context-card">
                 <span>Comanda selecionada</span>
-                <strong>{{ getComandaLabel(activeComanda) }}</strong>
+                <strong [class.registered-client-name]="isRegisteredClienteComanda(activeComanda)">{{ getComandaLabel(activeComanda) }}</strong>
                 <em>{{ getComandaStatusLabel(activeComanda) }}</em>
               </div>
 
@@ -359,7 +362,7 @@ type MenuViewMode = 'grid' | 'lista';
 
             <div class="confirmation-summary">
               <span>Cliente</span>
-              <strong>{{ finishCandidate.clienteNome || 'Cliente não informado' }}</strong>
+              <strong [class.registered-client-name]="isRegisteredClienteComanda(finishCandidate)">{{ finishCandidate.clienteNome || 'Cliente não informado' }}</strong>
 
               <span>Mesa</span>
               <strong>Mesa {{ displayMesaNumber }}</strong>
@@ -725,6 +728,11 @@ export class ComandaDetailModalComponent implements OnChanges {
   protected isFinalized(comanda: Comanda): boolean {
     return this.comandasService.isComandaFinalizada(comanda);
   }
+
+  protected isRegisteredClienteComanda(comanda: Comanda | null): boolean {
+    return Boolean(comanda?.clienteId);
+  }
+
 
   protected openFinishConfirmation(comanda: Comanda): void {
     if (!this.canEditSelectedComanda || this.items.length === 0) {

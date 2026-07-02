@@ -1,17 +1,8 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { TelaSistema } from '../models/app-data';
 import { AuthService } from '../services/auth.service';
-import { IconComponent, IconName } from './icon.component';
-
-interface MenuItem {
-  label: string;
-  path: string;
-  icon: IconName;
-  tela: TelaSistema;
-  disabled?: boolean;
-  badge?: string;
-}
+import { MenuOrderService } from '../services/menu-order.service';
+import { IconComponent } from './icon.component';
 
 @Component({
   selector: 'app-sidebar',
@@ -71,21 +62,9 @@ interface MenuItem {
 })
 export class SidebarComponent {
   protected readonly authService = inject(AuthService);
+  private readonly menuOrderService = inject(MenuOrderService);
 
-  private readonly menuItems: MenuItem[] = [
-    { label: 'Mapa de Comandas', path: '/mapa', icon: 'commandMap', tela: 'mapa' },
-    { label: 'Comandas', path: '/comandas', icon: 'receipt', tela: 'comandas', disabled: true, badge: 'Em breve' },
-    { label: 'Mesas', path: '/mesas', icon: 'table', tela: 'mesas' },
-    { label: 'Clientes', path: '/clientes', icon: 'users', tela: 'clientes' },
-    { label: 'Pedidos', path: '/pedidos', icon: 'bell', tela: 'pedidos' },
-    { label: 'Colaboradores', path: '/colaboradores', icon: 'shield', tela: 'colaboradores' },
-    { label: 'Caixa', path: '/caixa', icon: 'register', tela: 'caixa' },
-    { label: 'Cardápio', path: '/cardapio', icon: 'cards', tela: 'cardapio' },
-    { label: 'Relatórios', path: '/relatorios', icon: 'file', tela: 'relatorios', disabled: true, badge: 'Em breve' },
-    { label: 'Configurações', path: '/configuracoes', icon: 'settings', tela: 'configuracoes' },
-  ];
-
-  protected get visibleMenuItems(): MenuItem[] {
-    return this.menuItems.filter((item) => this.authService.canRead(item.tela));
+  protected get visibleMenuItems() {
+    return this.menuOrderService.menuItems().filter((item) => this.authService.canRead(item.tela));
   }
 }
