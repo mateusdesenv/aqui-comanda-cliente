@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Angular build output
+dist/
+out-tsc/
+tmp/
+temp/
+
+# Angular cache
+.angular/cache/
+.angular/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDEs and editors
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Runtime / cache
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# TypeScript
+*.tsbuildinfo
+
+# Local server / Vite / misc
+.vite/
+.local/
+
+# Package manager lock exception:
+# Keep lock files versioned for reproducible installs.
+# Do not ignore:
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
