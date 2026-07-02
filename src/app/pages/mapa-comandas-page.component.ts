@@ -93,7 +93,7 @@ import { AuthService } from '../services/auth.service';
                 <div class="quick-comanda-actions">
                   @if (canWriteMapa) {
                     <button class="quick-comanda-edit-button" type="button" (click)="editQuickComanda(comanda)">Editar</button>
-                    <button class="quick-comanda-close-button" type="button" (click)="closeQuickComanda(comanda)">Fechar</button>
+                    <button class="quick-comanda-close-button" type="button" (click)="openQuickFinishConfirmation(comanda)">Finalizar</button>
                   } @else {
                     <span class="readonly-chip">Somente leitura</span>
                   }
@@ -133,6 +133,40 @@ import { AuthService } from '../services/auth.service';
           (saved)="handleQuickComandaSaved($event)"
         />
       }
+
+      @if (quickFinishCandidate) {
+        <section class="confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-finish-title">
+          <div class="confirmation-card">
+            <h3 id="quick-finish-title">Finalizar comanda rápida</h3>
+            <p>Confirme o encerramento. Depois de paga, esta comanda rápida sai da lista de abertas e não poderá receber novos itens.</p>
+
+            <div class="confirmation-summary">
+              <span>Cliente</span>
+              <strong>{{ quickFinishCandidate.clienteNome || 'Cliente não informado' }}</strong>
+
+              <span>Tipo</span>
+              <strong>Comanda rápida sem mesa</strong>
+
+              <span>Total final</span>
+              <strong>{{ formatCurrency(quickFinishCandidate.total) }}</strong>
+            </div>
+
+            <div class="confirmation-items">
+              @for (item of quickFinishCandidate.itens; track item.id) {
+                <div>
+                  <span>{{ item.quantidade }}x {{ item.nome }}</span>
+                  <strong>{{ formatCurrency(item.subtotal) }}</strong>
+                </div>
+              }
+            </div>
+
+            <div class="confirmation-actions">
+              <button class="modal-secondary-action" type="button" (click)="cancelQuickFinishConfirmation()">Cancelar</button>
+              <button class="modal-primary-action" type="button" (click)="confirmQuickFinishComanda()">Encerrar e marcar como paga</button>
+            </div>
+          </div>
+        </section>
+      }
     </div>
   `,
 })
@@ -151,6 +185,7 @@ export class MapaComandasPageComponent {
   protected quickComandaModalOpen = false;
   protected editingQuickComanda: Comanda | null = null;
   protected quickComandaInitialMesaId = '';
+  protected quickFinishCandidate: Comanda | null = null;
 
   protected get cards(): MapaMesaCard[] {
     return this.comandasService.getCardsForMesas(this.mesasService.mesas());
@@ -241,6 +276,36 @@ export class MapaComandasPageComponent {
     this.quickComandaModalOpen = true;
   }
 
+  protected openQuickFinishConfirmation(comanda: Comanda): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
+    this.feedbackMessage = '';
+    this.quickFinishCandidate = comanda;
+  }
+
+  protected cancelQuickFinishConfirmation(): void {
+    this.quickFinishCandidate = null;
+  }
+
+  protected confirmQuickFinishComanda(): void {
+    if (!this.quickFinishCandidate || !this.ensureCanWrite()) {
+      return;
+    }
+
+    const clienteNome = this.quickFinishCandidate.clienteNome ?? 'cliente';
+    const finalized = this.comandasService.finalizeComandaById(this.quickFinishCandidate.id);
+    this.quickFinishCandidate = null;
+
+    if (!finalized) {
+      this.feedbackMessage = 'Não foi possível finalizar a comanda rápida. Verifique se ela ainda está aberta e possui itens.';
+      return;
+    }
+
+    this.feedbackMessage = `Comanda rápida de ${clienteNome} finalizada, marcada como paga e registrada no caixa.`;
+  }
+
   protected closeQuickComandaModal(): void {
     this.quickComandaModalOpen = false;
     this.editingQuickComanda = null;
@@ -262,12 +327,7 @@ export class MapaComandasPageComponent {
   }
 
   protected closeQuickComanda(comanda: Comanda): void {
-    if (!this.ensureCanWrite()) {
-      return;
-    }
-
-    this.comandasService.closeComandaById(comanda.id);
-    this.feedbackMessage = `Comanda de ${comanda.clienteNome ?? 'cliente'} fechada.`;
+    this.openQuickFinishConfirmation(comanda);
   }
 
   protected getMesaLabel(mesaId: string): string {

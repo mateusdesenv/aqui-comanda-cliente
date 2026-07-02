@@ -49,7 +49,7 @@ type CategoryTab = ProductCategory | 'Todos';
         <div class="quick-customer-strip">
           <label>
             Cliente responsável pela comanda
-            <select name="cliente" [(ngModel)]="selectedClienteId" (ngModelChange)="errorMessage = ''">
+            <select name="cliente" [(ngModel)]="selectedClienteId" [disabled]="!canEditComanda" (ngModelChange)="errorMessage = ''">
               <option value="">Selecione um cliente</option>
               @for (cliente of clientes; track cliente.id) {
                 <option [value]="cliente.id">
@@ -61,7 +61,7 @@ type CategoryTab = ProductCategory | 'Todos';
 
           <label>
             Mesa vinculada <span class="optional-label">opcional</span>
-            <select name="mesa" [(ngModel)]="selectedMesaId" (ngModelChange)="errorMessage = ''">
+            <select name="mesa" [(ngModel)]="selectedMesaId" [disabled]="!canEditComanda" (ngModelChange)="errorMessage = ''">
               <option value="">Sem mesa — comanda rápida</option>
               @for (mesa of mesasDisponiveis; track mesa.id) {
                 <option [value]="mesa.id">
@@ -121,7 +121,7 @@ type CategoryTab = ProductCategory | 'Todos';
                         <button
                           type="button"
                           aria-label="Diminuir quantidade"
-                          [disabled]="getQuantity(produto) === 0"
+                          [disabled]="!canEditComanda || getQuantity(produto) === 0"
                           (click)="decrementQuantity(produto)"
                         >
                           -
@@ -130,13 +130,14 @@ type CategoryTab = ProductCategory | 'Todos';
                         <button
                           type="button"
                           aria-label="Aumentar quantidade"
+                          [disabled]="!canEditComanda"
                           (click)="incrementQuantity(produto)"
                         >
                           +
                         </button>
                       </div>
 
-                      <button class="add-product-button" type="button" (click)="addItem(produto)">
+                      <button class="add-product-button" type="button" [disabled]="!canEditComanda" (click)="addItem(produto)">
                         Adicionar
                       </button>
                     </div>
@@ -155,7 +156,7 @@ type CategoryTab = ProductCategory | 'Todos';
           <section class="detail-panel order-panel" aria-label="Itens selecionados">
             <div class="detail-panel-header order-header">
               <h3>Itens selecionados</h3>
-              <button class="clear-order-button" type="button" (click)="clearComanda()">
+              <button class="clear-order-button" type="button" [disabled]="!canEditComanda" (click)="clearComanda()">
                 Limpar seleção
               </button>
             </div>
@@ -179,13 +180,13 @@ type CategoryTab = ProductCategory | 'Todos';
                   <div class="order-item-row" role="row">
                     <strong role="cell">{{ item.nome }}</strong>
                     <div role="cell" class="inline-quantity-control" [attr.aria-label]="'Quantidade de ' + item.nome">
-                      <button type="button" aria-label="Diminuir item" (click)="changeItemQuantity(item, item.quantidade - 1)">-</button>
+                      <button type="button" aria-label="Diminuir item" [disabled]="!canEditComanda" (click)="changeItemQuantity(item, item.quantidade - 1)">-</button>
                       <span>{{ item.quantidade }}</span>
-                      <button type="button" aria-label="Aumentar item" (click)="changeItemQuantity(item, item.quantidade + 1)">+</button>
+                      <button type="button" aria-label="Aumentar item" [disabled]="!canEditComanda" (click)="changeItemQuantity(item, item.quantidade + 1)">+</button>
                     </div>
                     <span role="cell">{{ formatCurrency(item.precoUnitario) }}</span>
                     <span role="cell">{{ formatCurrency(item.subtotal) }}</span>
-                    <button type="button" (click)="removeItem(item)">Remover</button>
+                    <button type="button" [disabled]="!canEditComanda" (click)="removeItem(item)">Remover</button>
                   </div>
                 } @empty {
                   <div class="empty-order-state">
@@ -284,8 +285,12 @@ export class QuickComandaModalComponent implements OnChanges {
     return this.activeProducts.filter((produto) => produto.categoria === this.activeCategory);
   }
 
+  protected get canEditComanda(): boolean {
+    return !this.editingComanda || this.comandasService.isComandaAberta(this.editingComanda);
+  }
+
   protected get canSave(): boolean {
-    return Boolean(this.selectedClienteId) && this.items.length > 0;
+    return this.canEditComanda && Boolean(this.selectedClienteId) && this.items.length > 0;
   }
 
   protected get selectedMesaLabel(): string {
@@ -307,6 +312,10 @@ export class QuickComandaModalComponent implements OnChanges {
   }
 
   protected incrementQuantity(produto: Produto): void {
+    if (!this.canEditComanda) {
+      return;
+    }
+
     this.productQuantities = {
       ...this.productQuantities,
       [produto.id]: this.getQuantity(produto) + 1,
@@ -314,6 +323,10 @@ export class QuickComandaModalComponent implements OnChanges {
   }
 
   protected decrementQuantity(produto: Produto): void {
+    if (!this.canEditComanda) {
+      return;
+    }
+
     this.productQuantities = {
       ...this.productQuantities,
       [produto.id]: Math.max(this.getQuantity(produto) - 1, 0),
@@ -321,6 +334,10 @@ export class QuickComandaModalComponent implements OnChanges {
   }
 
   protected addItem(produto: Produto): void {
+    if (!this.canEditComanda) {
+      return;
+    }
+
     this.errorMessage = '';
     const quantidade = Math.max(this.getQuantity(produto), 1);
     const existingItem = this.items.find((item) => item.productId === produto.id);
@@ -344,6 +361,10 @@ export class QuickComandaModalComponent implements OnChanges {
   }
 
   protected changeItemQuantity(itemToChange: ItemComanda, nextQuantity: number): void {
+    if (!this.canEditComanda) {
+      return;
+    }
+
     if (nextQuantity <= 0) {
       this.removeItem(itemToChange);
       return;
@@ -361,16 +382,29 @@ export class QuickComandaModalComponent implements OnChanges {
   }
 
   protected removeItem(itemToRemove: ItemComanda): void {
+    if (!this.canEditComanda) {
+      return;
+    }
+
     this.items = this.items.filter((item) => item.id !== itemToRemove.id);
   }
 
   protected clearComanda(): void {
+    if (!this.canEditComanda) {
+      return;
+    }
+
     this.items = [];
     this.errorMessage = '';
   }
 
   protected saveComanda(): void {
     this.errorMessage = '';
+
+    if (!this.canEditComanda) {
+      this.errorMessage = 'Esta comanda já foi finalizada e não pode mais ser alterada.';
+      return;
+    }
     const selectedCliente = this.clientes.find((cliente) => cliente.id === this.selectedClienteId);
 
     if (!selectedCliente) {

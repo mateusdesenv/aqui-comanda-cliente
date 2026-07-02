@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { AppLayoutComponent } from './components/app-layout.component';
+import { CaixaPageComponent } from './pages/caixa-page.component';
 import { CardapioPageComponent } from './pages/cardapio-page.component';
 import { ClientesPageComponent } from './pages/clientes-page.component';
 import { ColaboradoresPageComponent } from './pages/colaboradores-page.component';
@@ -25,7 +26,7 @@ export const routes: Routes = [
       { path: 'clientes', component: ClientesPageComponent, canActivate: [permissionGuard], data: { tela: 'clientes' } },
       { path: 'pedidos', component: PedidosPageComponent, canActivate: [permissionGuard], data: { tela: 'pedidos' } },
       { path: 'colaboradores', component: ColaboradoresPageComponent, canActivate: [permissionGuard], data: { tela: 'colaboradores' } },
-      { path: 'caixa', component: ConstructionPageComponent, canActivate: [permissionGuard], data: { tela: 'caixa', title: 'Caixa' } },
+      { path: 'caixa', component: CaixaPageComponent, canActivate: [permissionGuard], data: { tela: 'caixa' } },
       { path: 'cardapio', component: CardapioPageComponent, canActivate: [permissionGuard], data: { tela: 'cardapio' } },
       { path: 'relatorios', component: ConstructionPageComponent, canActivate: [permissionGuard], data: { tela: 'relatorios', title: 'Relatórios' } },
       { path: 'configuracoes', component: ConfiguracoesPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },

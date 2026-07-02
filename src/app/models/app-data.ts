@@ -1,4 +1,4 @@
-export type ComandaStatus = 'aberta' | 'fechada';
+export type ComandaStatus = 'aberta' | 'finalizada';
 export type ProductCategory = 'Lanches' | 'Bebidas' | 'Porções' | 'Sobremesas';
 export type MesaStatus = 'livre' | 'reservada' | 'inativa';
 export type MapaMesaStatus = 'livre' | 'ocupada' | 'reservada' | 'inativa';
@@ -7,6 +7,8 @@ export type ComandaTipo = 'mesa' | 'avulsa';
 
 export type PedidoStatus = 'aberto' | 'em_preparo' | 'saiu_entrega' | 'entregue' | 'cancelado';
 export type PedidoPaymentMethod = 'dinheiro' | 'pix' | 'credito' | 'debito' | 'outro';
+export type TipoEntradaCaixa = 'comanda';
+export type CaixaDateFilter = 'todas' | 'hoje' | 'ultimos_7' | 'ultimos_30';
 
 export type NivelAcesso = 'admin' | 'colaborador';
 
@@ -79,6 +81,21 @@ export interface Pedido {
   updatedAt: string;
 }
 
+export interface EntradaCaixa {
+  id: string;
+  tipo: TipoEntradaCaixa;
+  origemId: string;
+  origemDescricao: string;
+  clienteId?: string;
+  clienteNome?: string;
+  mesaId?: string | null;
+  mesaNumero?: number | string | null;
+  valor: number;
+  formaPagamento?: string;
+  criadaEm: string;
+  comandaFinalizadaEm?: string;
+}
+
 export interface Comanda {
   id: string;
   mesaId?: string;
@@ -86,6 +103,9 @@ export interface Comanda {
   clienteNome?: string;
   tipo?: ComandaTipo;
   status: ComandaStatus;
+  paga: boolean;
+  finalizadaEm?: string;
+  totalFinalizado?: number;
   itens: ItemComanda[];
   total: number;
   createdAt: string;

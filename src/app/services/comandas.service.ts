@@ -1,6 +1,8 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Comanda, ItemComanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
+import { CaixaService } from './caixa.service';
 import { LocalStorageRepository } from './local-storage.repository';
+import { MesasService } from './mesas.service';
 
 interface SaveComandaPayload {
   clienteId: string;
@@ -11,13 +13,21 @@ interface SaveComandaPayload {
 
 @Injectable({ providedIn: 'root' })
 export class ComandasService {
+  private readonly caixaService = inject(CaixaService);
+  private readonly mesasService = inject(MesasService);
+
   private readonly repository = new LocalStorageRepository<Comanda[]>(
     'aqui-comanda:open-comandas',
     [],
   );
 
   readonly comandas = signal<Comanda[]>(this.normalizeComandas(this.repository.read()));
-  readonly comandasAbertas = computed(() => this.comandas().filter((comanda) => comanda.status === 'aberta'));
+  readonly comandasAbertas = computed(() =>
+    this.comandas().filter((comanda) => this.isComandaAberta(comanda)),
+  );
+  readonly comandasFinalizadas = computed(() =>
+    this.comandas().filter((comanda) => this.isComandaFinalizada(comanda)),
+  );
   readonly comandasAvulsas = computed(() =>
     this.comandasAbertas().filter((comanda) => !comanda.mesaId),
   );
@@ -27,6 +37,10 @@ export class ComandasService {
   }
 
   getComandas(): Comanda[] {
+    return this.comandas();
+  }
+
+  getOpenComandas(): Comanda[] {
     return this.comandasAbertas();
   }
 
@@ -34,8 +48,27 @@ export class ComandasService {
     return this.comandasAvulsas();
   }
 
+  getComandasForMesa(mesaId: string): Comanda[] {
+    return this.comandas()
+      .filter((comanda) => comanda.mesaId === mesaId)
+      .sort((first, second) => {
+        const firstStatusWeight = this.isComandaAberta(first) ? 0 : 1;
+        const secondStatusWeight = this.isComandaAberta(second) ? 0 : 1;
+
+        if (firstStatusWeight !== secondStatusWeight) {
+          return firstStatusWeight - secondStatusWeight;
+        }
+
+        return new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime();
+      });
+  }
+
   getOpenComandasForMesa(mesaId: string): Comanda[] {
     return this.comandasAbertas().filter((comanda) => comanda.mesaId === mesaId);
+  }
+
+  getFinishedComandasForMesa(mesaId: string): Comanda[] {
+    return this.comandasFinalizadas().filter((comanda) => comanda.mesaId === mesaId);
   }
 
   getOpenComandaForMesa(mesaId: string): Comanda | null {
@@ -58,6 +91,7 @@ export class ComandasService {
       clienteNome: payload.clienteNome,
       tipo: mesaId ? 'mesa' : 'avulsa',
       status: 'aberta',
+      paga: false,
       itens: updatedItems,
       total: this.getItemsTotal(updatedItems),
       createdAt: now,
@@ -81,7 +115,7 @@ export class ComandasService {
   updateComanda(comandaId: string, payload: SaveComandaPayload): Comanda | null {
     const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
 
-    if (!existingComanda) {
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
       return null;
     }
 
@@ -94,6 +128,9 @@ export class ComandasService {
       clienteNome: payload.clienteNome,
       tipo: mesaId ? 'mesa' : 'avulsa',
       status: 'aberta',
+      paga: false,
+      finalizadaEm: undefined,
+      totalFinalizado: undefined,
       itens: updatedItems,
       total: this.getItemsTotal(updatedItems),
       updatedAt: new Date().toISOString(),
@@ -108,10 +145,16 @@ export class ComandasService {
     return updatedComanda;
   }
 
-  saveItemsForComanda(comandaId: string, items: ItemComanda[]): void {
+  saveItemsForComanda(comandaId: string, items: ItemComanda[]): boolean {
+    const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
+      return false;
+    }
+
     if (items.length === 0) {
-      this.closeComandaById(comandaId);
-      return;
+      this.removeOpenComandaById(comandaId);
+      return true;
     }
 
     const updatedItems = this.normalizeItems(items);
@@ -126,14 +169,67 @@ export class ComandasService {
       ),
     );
     this.persist();
+    return true;
+  }
+
+  finalizeComandaById(comandaId: string): Comanda | null {
+    const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
+      return null;
+    }
+
+    const itens = this.normalizeItems(existingComanda.itens ?? []);
+
+    if (itens.length === 0) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const totalFinalizado = this.getItemsTotal(itens);
+    const finalizedComanda: Comanda = {
+      ...existingComanda,
+      status: 'finalizada',
+      paga: true,
+      finalizadaEm: now,
+      totalFinalizado,
+      itens,
+      total: totalFinalizado,
+      updatedAt: now,
+    };
+
+    this.comandas.set(
+      this.comandas().map((comanda) =>
+        comanda.id === comandaId ? finalizedComanda : comanda,
+      ),
+    );
+    this.persist();
+
+    const mesa = finalizedComanda.mesaId
+      ? this.mesasService.getMesas().find((currentMesa) => currentMesa.id === finalizedComanda.mesaId) ?? null
+      : null;
+
+    this.caixaService.registrarEntradaComanda(finalizedComanda, mesa);
+    return finalizedComanda;
   }
 
   closeComandaForMesa(mesaId: string): void {
-    this.comandas.set(this.comandas().filter((comanda) => comanda.mesaId !== mesaId));
-    this.persist();
+    this.getOpenComandasForMesa(mesaId).forEach((comanda) => {
+      this.finalizeComandaById(comanda.id);
+    });
   }
 
   closeComandaById(comandaId: string): void {
+    this.finalizeComandaById(comandaId);
+  }
+
+  removeOpenComandaById(comandaId: string): void {
+    const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+    if (!existingComanda || !this.isComandaAberta(existingComanda)) {
+      return;
+    }
+
     this.comandas.set(this.comandas().filter((comanda) => comanda.id !== comandaId));
     this.persist();
   }
@@ -168,6 +264,14 @@ export class ComandasService {
     };
   }
 
+  isComandaAberta(comanda: Comanda): boolean {
+    return comanda.status === 'aberta' && !comanda.paga;
+  }
+
+  isComandaFinalizada(comanda: Comanda): boolean {
+    return comanda.status === 'finalizada' || comanda.paga;
+  }
+
   private persist(): void {
     this.repository.write(this.comandas());
   }
@@ -178,14 +282,21 @@ export class ComandasService {
       .map((comanda) => {
         const itens = this.normalizeItems(comanda.itens ?? []);
         const mesaId = comanda.mesaId || undefined;
+        const rawStatus = String((comanda as Comanda & { status?: string }).status ?? 'aberta');
+        const isFinalizada = rawStatus === 'finalizada' || rawStatus === 'fechada' || Boolean(comanda.paga);
+        const total = this.getItemsTotal(itens);
+        const status = isFinalizada ? 'finalizada' : 'aberta';
 
         return {
           ...comanda,
           mesaId,
           tipo: mesaId ? 'mesa' : 'avulsa',
-          status: 'aberta',
+          status,
+          paga: isFinalizada,
+          finalizadaEm: isFinalizada ? comanda.finalizadaEm ?? comanda.updatedAt ?? new Date().toISOString() : undefined,
+          totalFinalizado: isFinalizada ? comanda.totalFinalizado ?? total : undefined,
           itens,
-          total: this.getItemsTotal(itens),
+          total: isFinalizada ? comanda.totalFinalizado ?? total : total,
         };
       });
   }

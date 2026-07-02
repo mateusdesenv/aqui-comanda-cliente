@@ -79,7 +79,7 @@ export class SidebarComponent {
     { label: 'Clientes', path: '/clientes', icon: 'users', tela: 'clientes' },
     { label: 'Pedidos', path: '/pedidos', icon: 'bell', tela: 'pedidos' },
     { label: 'Colaboradores', path: '/colaboradores', icon: 'shield', tela: 'colaboradores' },
-    { label: 'Caixa', path: '/caixa', icon: 'register', tela: 'caixa', disabled: true, badge: 'Em breve' },
+    { label: 'Caixa', path: '/caixa', icon: 'register', tela: 'caixa' },
     { label: 'Cardápio', path: '/cardapio', icon: 'cards', tela: 'cardapio' },
     { label: 'Relatórios', path: '/relatorios', icon: 'file', tela: 'relatorios', disabled: true, badge: 'Em breve' },
     { label: 'Configurações', path: '/configuracoes', icon: 'settings', tela: 'configuracoes' },
