@@ -63,6 +63,6 @@ coverage/
 # Package manager lock exception:
 # Keep lock files versioned for reproducible installs.
 # Do not ignore:
-# package-lock.json
+package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
