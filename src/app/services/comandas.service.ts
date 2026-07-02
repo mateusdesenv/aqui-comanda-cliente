@@ -5,8 +5,9 @@ import { LocalStorageRepository } from './local-storage.repository';
 import { MesasService } from './mesas.service';
 
 interface SaveComandaPayload {
-  clienteId: string;
+  clienteId?: string;
   clienteNome: string;
+  clienteManual?: boolean;
   items: ItemComanda[];
   mesaId?: string;
 }
@@ -120,6 +121,7 @@ export class ComandasService {
       mesaLiberadaEm: undefined,
       clienteId: payload.clienteId,
       clienteNome: payload.clienteNome,
+      clienteManual: payload.clienteManual ?? !payload.clienteId,
       tipo: mesaId ? 'mesa' : 'avulsa',
       status: 'aberta',
       paga: false,
@@ -158,6 +160,7 @@ export class ComandasService {
       mesaLiberadaEm: undefined,
       clienteId: payload.clienteId,
       clienteNome: payload.clienteNome,
+      clienteManual: payload.clienteManual ?? !payload.clienteId,
       tipo: mesaId ? 'mesa' : 'avulsa',
       status: 'aberta',
       paga: false,
@@ -329,6 +332,7 @@ export class ComandasService {
           ...comanda,
           mesaId,
           mesaLiberadaEm: comanda.mesaLiberadaEm,
+          clienteManual: comanda.clienteManual ?? !comanda.clienteId,
           tipo: mesaId ? 'mesa' : 'avulsa',
           status,
           paga: isFinalizada,

@@ -5,6 +5,8 @@ import { StatCardComponent } from '../components/stat-card.component';
 import { CaixaDateFilter, EntradaCaixa } from '../models/app-data';
 import { CaixaService } from '../services/caixa.service';
 
+type CaixaTipoFilter = 'todos' | 'comanda';
+
 @Component({
   selector: 'app-caixa-page',
   standalone: true,
@@ -37,6 +39,39 @@ import { CaixaService } from '../services/caixa.service';
             <option value="ultimos_30">Últimos 30 dias</option>
           </select>
         </label>
+
+        <label>
+          Forma de pagamento
+          <select name="caixaPagamento" [(ngModel)]="paymentFilter">
+            <option value="todos">Todas</option>
+            @for (forma of formasPagamento; track forma) {
+              <option [value]="forma">{{ forma }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Mesa
+          <select name="caixaMesa" [(ngModel)]="mesaFilter">
+            <option value="todos">Todas</option>
+            <option value="rapida">Comanda rápida</option>
+            @for (mesa of mesasFiltro; track mesa) {
+              <option [value]="mesa">Mesa {{ mesa }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Tipo
+          <select name="caixaTipo" [(ngModel)]="tipoFilter">
+            <option value="todos">Todos</option>
+            <option value="comanda">Comanda paga</option>
+          </select>
+        </label>
+
+        <button class="clear-filters-button" type="button" (click)="clearFilters()">
+          Limpar filtros
+        </button>
       </section>
 
       <section class="stats-grid" aria-label="Resumo do caixa">
@@ -102,27 +137,69 @@ export class CaixaPageComponent {
 
   protected search = '';
   protected dateFilter: CaixaDateFilter = 'todas';
+  protected paymentFilter = 'todos';
+  protected mesaFilter = 'todos';
+  protected tipoFilter: CaixaTipoFilter = 'todos';
 
   protected get entradas(): EntradaCaixa[] {
     return this.caixaService.getEntradas();
   }
 
+  protected get formasPagamento(): string[] {
+    return [...new Set(this.entradas.map((entrada) => entrada.formaPagamento || 'Não informado'))].sort(
+      (a, b) => a.localeCompare(b, 'pt-BR'),
+    );
+  }
+
+  protected get mesasFiltro(): string[] {
+    return [...new Set(
+      this.entradas
+        .filter((entrada) => entrada.mesaNumero !== null && entrada.mesaNumero !== undefined)
+        .map((entrada) => String(entrada.mesaNumero).padStart(2, '0')),
+    )].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }
+
   protected get filteredEntradas(): EntradaCaixa[] {
     const normalizedSearch = this.search.trim().toLowerCase();
-    const filteredByDate = this.entradas.filter((entrada) => this.matchesDateFilter(entrada));
 
-    if (!normalizedSearch) {
-      return filteredByDate;
-    }
+    return this.entradas.filter((entrada) => {
+      if (!this.matchesDateFilter(entrada)) {
+        return false;
+      }
 
-    return filteredByDate.filter((entrada) => {
+      if (this.tipoFilter !== 'todos' && entrada.tipo !== this.tipoFilter) {
+        return false;
+      }
+
+      const formaPagamento = entrada.formaPagamento || 'Não informado';
+      if (this.paymentFilter !== 'todos' && formaPagamento !== this.paymentFilter) {
+        return false;
+      }
+
+      if (this.mesaFilter === 'rapida' && entrada.mesaNumero) {
+        return false;
+      }
+
+      if (
+        this.mesaFilter !== 'todos' &&
+        this.mesaFilter !== 'rapida' &&
+        String(entrada.mesaNumero).padStart(2, '0') !== this.mesaFilter
+      ) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
       const searchBase = [
         entrada.origemId,
         entrada.origemDescricao,
         entrada.clienteNome,
-        entrada.mesaNumero ? `Mesa ${entrada.mesaNumero}` : '',
-        entrada.formaPagamento,
+        entrada.mesaNumero ? `Mesa ${entrada.mesaNumero}` : 'Comanda rápida',
+        formaPagamento,
         this.getTipoLabel(entrada),
+        this.getShortId(entrada.origemId),
       ]
         .filter(Boolean)
         .join(' ')
@@ -142,6 +219,14 @@ export class CaixaPageComponent {
 
   protected get totalComandasPagas(): number {
     return this.filteredEntradas.filter((entrada) => entrada.tipo === 'comanda').length;
+  }
+
+  protected clearFilters(): void {
+    this.search = '';
+    this.dateFilter = 'todas';
+    this.paymentFilter = 'todos';
+    this.mesaFilter = 'todos';
+    this.tipoFilter = 'todos';
   }
 
   protected getTipoLabel(entrada: EntradaCaixa): string {

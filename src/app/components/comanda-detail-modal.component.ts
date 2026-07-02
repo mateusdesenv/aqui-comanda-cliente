@@ -6,6 +6,7 @@ import { ComandasService } from '../services/comandas.service';
 import { ProdutosService } from '../services/produtos.service';
 
 type CategoryTab = ProductCategory | 'Todos';
+type MenuViewMode = 'grid' | 'lista';
 
 @Component({
   selector: 'app-comanda-detail-modal',
@@ -144,8 +145,27 @@ type CategoryTab = ProductCategory | 'Todos';
 
           <div class="comanda-detail-grid">
             <section class="detail-panel menu-panel" aria-label="Cardápio">
-              <div class="detail-panel-header">
-                <h3>Cardápio</h3>
+              <div class="detail-panel-header menu-panel-toolbar">
+                <div>
+                  <h3>Cardápio</h3>
+                  <span>Alterne a visualização para operar com mais rapidez.</span>
+                </div>
+                <div class="view-toggle" aria-label="Visualização do cardápio">
+                  <button
+                    type="button"
+                    [class.active]="menuViewMode === 'lista'"
+                    (click)="setMenuViewMode('lista')"
+                  >
+                    Lista
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="menuViewMode === 'grid'"
+                    (click)="setMenuViewMode('grid')"
+                  >
+                    Grid
+                  </button>
+                </div>
               </div>
 
               @if (activeProducts.length > 0) {
@@ -164,7 +184,7 @@ type CategoryTab = ProductCategory | 'Todos';
                   }
                 </div>
 
-                <div class="product-grid">
+                <div class="product-grid" [class.product-list-view]="menuViewMode === 'lista'">
                   @for (produto of filteredProducts; track produto.id) {
                     <article
                       class="product-card"
@@ -431,6 +451,7 @@ export class ComandaDetailModalComponent implements OnChanges {
   private readonly produtosService = inject(ProdutosService);
 
   protected activeCategory: CategoryTab = 'Todos';
+  protected menuViewMode: MenuViewMode = 'grid';
   protected selectedComandaId = '';
   protected items: ItemComanda[] = [];
   protected productQuantities: Record<string, number> = {};
@@ -543,6 +564,10 @@ export class ComandaDetailModalComponent implements OnChanges {
 
   protected setActiveCategory(category: CategoryTab): void {
     this.activeCategory = category;
+  }
+
+  protected setMenuViewMode(mode: MenuViewMode): void {
+    this.menuViewMode = mode;
   }
 
   protected selectComanda(comanda: Comanda): void {

@@ -16,7 +16,7 @@ interface ClienteFormModel {
   standalone: true,
   imports: [FormsModule],
   template: `
-    <div class="page-stack management-page">
+    <div class="page-stack management-page clientes-page">
       <section class="page-head">
         <div>
           <h1>Clientes</h1>
@@ -24,117 +24,139 @@ interface ClienteFormModel {
         </div>
       </section>
 
-      <section class="management-grid">
-        <form class="management-form-card" (ngSubmit)="saveCliente()">
-          <div class="form-card-head">
-            <h2>{{ editingClienteId ? 'Editar cliente' : 'Novo cliente' }}</h2>
-            @if (editingClienteId) {
-              <button class="ghost-button" type="button" (click)="resetForm()">Cancelar edição</button>
-            }
+      @if (errorMessage && !clienteModalOpen) {
+        <div class="form-feedback">{{ errorMessage }}</div>
+      }
+
+      @if (successMessage && !clienteModalOpen) {
+        <div class="form-feedback success">{{ successMessage }}</div>
+      }
+
+      <section class="management-list-card full-management-list">
+        <div class="list-card-head">
+          <div>
+            <h2>Clientes cadastrados</h2>
+            <span>{{ clientes.length }} clientes no sistema</span>
+          </div>
+        </div>
+
+        <div class="management-table client-table">
+          <div class="management-table-head">
+            <span>Cliente</span>
+            <span>CPF</span>
+            <span>Nascimento</span>
+            <span>Endereço</span>
+            <span>Ações</span>
           </div>
 
-          <label>
-            Nome completo
-            <input
-              type="text"
-              name="nome"
-              required
-              placeholder="Ex.: João da Silva"
-              [(ngModel)]="form.nome"
-            />
-          </label>
-
-          <label>
-            CPF
-            <input
-              type="text"
-              name="cpf"
-              inputmode="numeric"
-              maxlength="14"
-              required
-              placeholder="000.000.000-00"
-              [ngModel]="form.cpf"
-              (ngModelChange)="onCpfChange($event)"
-            />
-          </label>
-
-          <label>
-            Data de nascimento
-            <input
-              type="date"
-              name="dataNascimento"
-              required
-              [(ngModel)]="form.dataNascimento"
-            />
-          </label>
-
-          <label>
-            Endereço
-            <textarea
-              name="endereco"
-              rows="4"
-              placeholder="Rua, número, bairro, cidade..."
-              [(ngModel)]="form.endereco"
-            ></textarea>
-          </label>
-
-          @if (errorMessage) {
-            <div class="form-feedback">{{ errorMessage }}</div>
-          }
-
-          @if (successMessage) {
-            <div class="form-feedback success">{{ successMessage }}</div>
-          }
-
-          <div class="form-actions">
-            <button class="primary-action-button" type="submit" [disabled]="!canWriteClientes">
-              {{ editingClienteId ? 'Salvar alterações' : 'Cadastrar cliente' }}
-            </button>
-            <button class="ghost-button" type="button" (click)="resetForm()">Cancelar</button>
-          </div>
-        </form>
-
-        <section class="management-list-card">
-          <div class="list-card-head">
-            <div>
-              <h2>Clientes cadastrados</h2>
-              <span>{{ clientes.length }} clientes no sistema</span>
-            </div>
-          </div>
-
-          <div class="management-table client-table">
-            <div class="management-table-head">
-              <span>Cliente</span>
-              <span>CPF</span>
-              <span>Nascimento</span>
-              <span>Endereço</span>
-              <span>Ações</span>
-            </div>
-
-            @for (cliente of clientes; track cliente.id) {
-              <div class="management-table-row">
-                <strong>{{ cliente.nome }}</strong>
-                <span>{{ cliente.cpf }}</span>
-                <span>{{ formatDate(cliente.dataNascimento) }}</span>
-                <span>{{ cliente.endereco || '-' }}</span>
-                <div class="row-actions">
-                  @if (canWriteClientes) {
-                    <button type="button" (click)="editCliente(cliente)">Editar</button>
-                    <button class="danger" type="button" (click)="deleteCliente(cliente)">Excluir</button>
-                  } @else {
-                    <span class="readonly-chip">Somente leitura</span>
-                  }
-                </div>
+          @for (cliente of clientes; track cliente.id) {
+            <div class="management-table-row">
+              <strong>{{ cliente.nome }}</strong>
+              <span>{{ cliente.cpf }}</span>
+              <span>{{ formatDate(cliente.dataNascimento) }}</span>
+              <span>{{ cliente.endereco || '-' }}</span>
+              <div class="row-actions">
+                @if (canWriteClientes) {
+                  <button type="button" (click)="editCliente(cliente)">Editar</button>
+                  <button class="danger" type="button" (click)="deleteCliente(cliente)">Excluir</button>
+                } @else {
+                  <span class="readonly-chip">Somente leitura</span>
+                }
               </div>
-            } @empty {
-              <div class="management-empty-state">
-                <strong>Nenhum cliente cadastrado</strong>
-                <span>Use o formulário ao lado para cadastrar o primeiro cliente.</span>
-              </div>
-            }
-          </div>
-        </section>
+            </div>
+          } @empty {
+            <div class="management-empty-state">
+              <strong>Nenhum cliente cadastrado</strong>
+              <span>Clique em Adicionar cliente para cadastrar o primeiro cliente.</span>
+            </div>
+          }
+        </div>
       </section>
+
+      @if (canWriteClientes) {
+        <button
+          class="floating-comanda-button floating-management-button"
+          type="button"
+          aria-label="Adicionar cliente"
+          (click)="openCreateModal()"
+        >
+          <span aria-hidden="true">+</span>
+          <span>Adicionar cliente</span>
+        </button>
+      }
+
+      @if (clienteModalOpen) {
+        <div class="comanda-modal-overlay" role="presentation">
+          <section class="management-modal-card" role="dialog" aria-modal="true" aria-labelledby="cliente-modal-title">
+            <button class="modal-close-button" type="button" aria-label="Fechar modal de cliente" (click)="closeModal()">
+              X
+            </button>
+
+            <header class="management-modal-header">
+              <h2 id="cliente-modal-title">{{ editingClienteId ? 'Editar cliente' : 'Adicionar cliente' }}</h2>
+              <p>{{ editingClienteId ? 'Atualize os dados do cliente selecionado.' : 'Cadastre um novo cliente para vincular às comandas e pedidos.' }}</p>
+            </header>
+
+            <form class="management-form-card modal-management-form" (ngSubmit)="saveCliente()">
+              <label>
+                Nome completo
+                <input
+                  type="text"
+                  name="nome"
+                  required
+                  placeholder="Ex.: João da Silva"
+                  [(ngModel)]="form.nome"
+                />
+              </label>
+
+              <label>
+                CPF
+                <input
+                  type="text"
+                  name="cpf"
+                  inputmode="numeric"
+                  maxlength="14"
+                  required
+                  placeholder="000.000.000-00"
+                  [ngModel]="form.cpf"
+                  (ngModelChange)="onCpfChange($event)"
+                />
+              </label>
+
+              <label>
+                Data de nascimento
+                <input
+                  type="date"
+                  name="dataNascimento"
+                  required
+                  [(ngModel)]="form.dataNascimento"
+                />
+              </label>
+
+              <label>
+                Endereço
+                <textarea
+                  name="endereco"
+                  rows="4"
+                  placeholder="Rua, número, bairro, cidade..."
+                  [(ngModel)]="form.endereco"
+                ></textarea>
+              </label>
+
+              @if (errorMessage) {
+                <div class="form-feedback">{{ errorMessage }}</div>
+              }
+
+              <div class="form-actions">
+                <button class="primary-action-button" type="submit" [disabled]="!canWriteClientes">
+                  {{ editingClienteId ? 'Salvar alterações' : 'Cadastrar cliente' }}
+                </button>
+                <button class="ghost-button" type="button" (click)="closeModal()">Cancelar</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      }
     </div>
   `,
 })
@@ -148,9 +170,28 @@ export class ClientesPageComponent {
 
   protected clientes = this.clientesService.getClientes();
   protected editingClienteId: string | null = null;
+  protected clienteModalOpen = false;
   protected errorMessage = '';
   protected successMessage = '';
   protected form: ClienteFormModel = this.createEmptyForm();
+
+  protected openCreateModal(): void {
+    if (!this.canWriteClientes) {
+      this.errorMessage = 'Você não tem permissão de escrita em Clientes.';
+      return;
+    }
+
+    this.editingClienteId = null;
+    this.form = this.createEmptyForm();
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.clienteModalOpen = true;
+  }
+
+  protected closeModal(): void {
+    this.clienteModalOpen = false;
+    this.resetForm();
+  }
 
   protected saveCliente(): void {
     if (!this.canWriteClientes) {
@@ -201,6 +242,7 @@ export class ClientesPageComponent {
     }
 
     this.refreshClientes();
+    this.clienteModalOpen = false;
     this.clearFormKeepingFeedback();
   }
 
@@ -219,6 +261,7 @@ export class ClientesPageComponent {
       dataNascimento: cliente.dataNascimento,
       endereco: cliente.endereco ?? '',
     };
+    this.clienteModalOpen = true;
   }
 
   protected deleteCliente(cliente: Cliente): void {
@@ -239,7 +282,6 @@ export class ClientesPageComponent {
   protected resetForm(): void {
     this.editingClienteId = null;
     this.errorMessage = '';
-    this.successMessage = '';
     this.form = this.createEmptyForm();
   }
 

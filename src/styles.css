@@ -4360,3 +4360,282 @@ button:disabled {
     width: 100%;
   }
 }
+
+/* Ajustes UI/UX finais: modais de gestão, cliente manual e filtros */
+.full-management-list {
+  width: 100%;
+}
+
+.management-page.clientes-page,
+.management-page.cardapio-page {
+  padding-bottom: 92px;
+}
+
+.floating-management-button span[aria-hidden='true'] {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.management-modal-card {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: min(88vh, 820px);
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(195, 124, 34, 0.12), transparent 24%),
+    var(--cd-bg);
+  box-shadow: 0 32px 90px rgba(18, 32, 25, 0.38);
+}
+
+.management-modal-header {
+  padding: clamp(26px, 3.5vw, 38px) clamp(22px, 3.5vw, 34px) 18px;
+  border-bottom: 1px solid var(--cd-border);
+}
+
+.management-modal-header h2 {
+  margin: 0;
+  padding-right: 54px;
+  color: var(--cd-green-950);
+  font-family: var(--font-title);
+  font-size: clamp(2rem, 4vw, 3.35rem);
+  font-weight: 400;
+  letter-spacing: -0.065em;
+  line-height: 0.98;
+}
+
+.management-modal-header p {
+  margin: 12px 0 0;
+  color: var(--cd-text-muted);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.modal-management-form {
+  position: static;
+  top: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.enhanced-customer-strip {
+  grid-template-columns: minmax(360px, 1fr) minmax(280px, 0.72fr);
+  align-items: start;
+}
+
+.customer-mode-card {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--cd-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.customer-mode-card legend {
+  padding: 0 8px;
+  color: var(--cd-green-900);
+  font-weight: 900;
+}
+
+.customer-mode-card label,
+.quick-mesa-field {
+  display: grid;
+  gap: 8px;
+  color: var(--cd-text);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.customer-mode-card input[type='text'],
+.quick-mesa-field select,
+.customer-mode-card select {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--cd-border);
+  border-radius: 13px;
+  color: var(--cd-text);
+  background-color: var(--cd-surface);
+  outline: none;
+  font-weight: 700;
+}
+
+.segmented-choice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segmented-choice label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--cd-border);
+  border-radius: 999px;
+  color: var(--cd-text-muted);
+  background: var(--cd-bg-soft);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.segmented-choice label.active {
+  border-color: transparent;
+  color: var(--cd-text-inverse);
+  background: var(--cd-green-900);
+}
+
+.segmented-choice input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--cd-amber-500);
+}
+
+.customer-mode-card small {
+  color: var(--cd-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.customer-link-indicator {
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: var(--cd-success);
+  background: var(--cd-success-bg);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customer-link-indicator.manual {
+  color: var(--cd-amber-700);
+  background: var(--cd-amber-50);
+}
+
+.quick-client-helper {
+  margin: 16px clamp(20px, 3.5vw, 46px) 0;
+}
+
+.menu-panel-toolbar {
+  align-items: flex-start;
+}
+
+.menu-panel-toolbar > div:first-child span {
+  display: block;
+  margin-top: 6px;
+  color: var(--cd-text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.view-toggle {
+  flex: 0 0 auto;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(64px, 1fr));
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--cd-border);
+  border-radius: 999px;
+  background: var(--cd-bg-soft);
+}
+
+.view-toggle button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--cd-text-muted);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.view-toggle button.active {
+  color: var(--cd-text-inverse);
+  background: var(--cd-amber-500);
+}
+
+.product-grid.product-list-view {
+  grid-template-columns: 1fr;
+}
+
+.product-grid.product-list-view .product-card {
+  min-height: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(220px, auto);
+  align-items: center;
+}
+
+.product-grid.product-list-view .product-actions {
+  justify-content: flex-end;
+}
+
+.caixa-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
+  align-items: end;
+  justify-content: stretch;
+}
+
+.clear-filters-button {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--cd-border);
+  border-radius: 13px;
+  color: var(--cd-green-900);
+  background: var(--cd-surface);
+  font-weight: 900;
+}
+
+.clear-filters-button:hover {
+  border-color: rgba(195, 124, 34, 0.42);
+  color: var(--cd-amber-700);
+}
+
+@media (max-width: 1180px) {
+  .caixa-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clear-filters-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 820px) {
+  .enhanced-customer-strip,
+  .segmented-choice,
+  .product-grid.product-list-view .product-card {
+    grid-template-columns: 1fr;
+  }
+
+  .view-toggle {
+    width: 100%;
+  }
+
+  .menu-panel-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 720px) {
+  .management-modal-card {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 18px;
+  }
+
+  .caixa-filters {
+    grid-template-columns: 1fr;
+  }
+}

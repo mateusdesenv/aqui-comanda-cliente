@@ -102,6 +102,7 @@ export interface Comanda {
   mesaLiberadaEm?: string;
   clienteId?: string;
   clienteNome?: string;
+  clienteManual?: boolean;
   tipo?: ComandaTipo;
   status: ComandaStatus;
   paga: boolean;
