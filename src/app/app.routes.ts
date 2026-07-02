@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AppLayoutComponent } from './components/app-layout.component';
 import { CardapioPageComponent } from './pages/cardapio-page.component';
+import { ClientesPageComponent } from './pages/clientes-page.component';
 import { ConstructionPageComponent } from './pages/construction-page.component';
 import { ConfiguracoesPageComponent } from './pages/configuracoes-page.component';
 import { LoginPageComponent } from './pages/login-page.component';
@@ -17,6 +18,7 @@ export const routes: Routes = [
       { path: 'mapa', component: MapaComandasPageComponent },
       { path: 'comandas', component: ConstructionPageComponent, data: { title: 'Comandas' } },
       { path: 'mesas', component: MesasPageComponent },
+      { path: 'clientes', component: ClientesPageComponent },
       { path: 'pedidos', component: ConstructionPageComponent, data: { title: 'Pedidos' } },
       { path: 'caixa', component: ConstructionPageComponent, data: { title: 'Caixa' } },
       { path: 'cardapio', component: CardapioPageComponent },

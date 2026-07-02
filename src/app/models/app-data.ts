@@ -3,9 +3,14 @@ export type ProductCategory = 'Lanches' | 'Bebidas' | 'Porções' | 'Sobremesas'
 export type MesaStatus = 'livre' | 'reservada' | 'inativa';
 export type MapaMesaStatus = 'livre' | 'ocupada' | 'reservada' | 'inativa';
 
+export type ComandaTipo = 'mesa' | 'avulsa';
+
 export interface Comanda {
   id: string;
-  mesaId: string;
+  mesaId?: string;
+  clienteId?: string;
+  clienteNome?: string;
+  tipo?: ComandaTipo;
   status: ComandaStatus;
   itens: ItemComanda[];
   total: number;
@@ -40,6 +45,17 @@ export interface ItemComanda {
   subtotal: number;
 }
 
+
+export interface Cliente {
+  id: string;
+  nome: string;
+  cpf: string;
+  dataNascimento: string;
+  endereco?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Mesa {
   id: string;
   numero: number;
@@ -55,6 +71,7 @@ export interface MapaMesaCard {
   mesa: Mesa;
   status: MapaMesaStatus;
   total: number;
+  totalComandas: number;
 }
 
 export const productCategories: ProductCategory[] = [

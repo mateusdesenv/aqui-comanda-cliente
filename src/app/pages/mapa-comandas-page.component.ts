@@ -3,9 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ComandaCardComponent } from '../components/comanda-card.component';
 import { ComandaDetailModalComponent } from '../components/comanda-detail-modal.component';
+import { QuickComandaModalComponent } from '../components/quick-comanda-modal.component';
 import { IconComponent } from '../components/icon.component';
 import { StatCardComponent } from '../components/stat-card.component';
-import { MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
+import { Comanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
 import { ComandasService } from '../services/comandas.service';
 import { MesasService } from '../services/mesas.service';
 
@@ -19,6 +20,7 @@ import { MesasService } from '../services/mesas.service';
     StatCardComponent,
     ComandaCardComponent,
     ComandaDetailModalComponent,
+    QuickComandaModalComponent,
   ],
   template: `
     <div class="page-stack">
@@ -70,10 +72,57 @@ import { MesasService } from '../services/mesas.service';
         </section>
       }
 
+      @if (quickComandas.length > 0) {
+        <section class="quick-comandas-panel" aria-label="Comandas rápidas abertas">
+          <div class="quick-comandas-head">
+            <div>
+              <h2>Comandas rápidas abertas</h2>
+              <span>{{ quickComandas.length }} comandas rápidas sem mesa vinculada</span>
+            </div>
+          </div>
+
+          <div class="quick-comandas-list">
+            @for (comanda of quickComandas; track comanda.id) {
+              <article class="quick-comanda-card">
+                <div>
+                  <strong>{{ comanda.clienteNome || 'Cliente não informado' }}</strong>
+                  <small>{{ comanda.itens.length }} itens lançados · sem mesa</small>
+                </div>
+                <span>{{ formatCurrency(comanda.total) }}</span>
+                <div class="quick-comanda-actions">
+                  <button class="quick-comanda-edit-button" type="button" (click)="editQuickComanda(comanda)">Editar</button>
+                  <button class="quick-comanda-close-button" type="button" (click)="closeQuickComanda(comanda)">Fechar</button>
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      <button
+        class="floating-comanda-button"
+        type="button"
+        aria-label="Criar nova comanda"
+        (click)="openQuickComandaModal()"
+      >
+        <app-icon name="receipt" [size]="22" />
+        <span>Criar nova comanda</span>
+      </button>
+
       @if (selectedMesa) {
         <app-comanda-detail-modal
           [mesa]="selectedMesa"
           (close)="closeComandaModal()"
+          (createForMesa)="openQuickComandaModalForMesa($event)"
+        />
+      }
+
+      @if (quickComandaModalOpen) {
+        <app-quick-comanda-modal
+          [editingComanda]="editingQuickComanda"
+          [initialMesaId]="quickComandaInitialMesaId"
+          (close)="closeQuickComandaModal()"
+          (saved)="handleQuickComandaSaved($event)"
         />
       }
     </div>
@@ -86,6 +135,9 @@ export class MapaComandasPageComponent {
   protected search = '';
   protected feedbackMessage = '';
   protected selectedMesa: Mesa | null = null;
+  protected quickComandaModalOpen = false;
+  protected editingQuickComanda: Comanda | null = null;
+  protected quickComandaInitialMesaId = '';
 
   protected get cards(): MapaMesaCard[] {
     return this.comandasService.getCardsForMesas(this.mesasService.mesas());
@@ -93,6 +145,10 @@ export class MapaComandasPageComponent {
 
   protected get resumo(): ResumoComandas {
     return this.comandasService.getResumoForMesas(this.mesasService.mesas());
+  }
+
+  protected get quickComandas(): Comanda[] {
+    return this.comandasService.getQuickComandas();
   }
 
   protected get filteredCards(): MapaMesaCard[] {
@@ -137,6 +193,62 @@ export class MapaComandasPageComponent {
 
   protected closeComandaModal(): void {
     this.selectedMesa = null;
+  }
+
+  protected openQuickComandaModal(): void {
+    this.feedbackMessage = '';
+    this.editingQuickComanda = null;
+    this.quickComandaInitialMesaId = '';
+    this.quickComandaModalOpen = true;
+  }
+
+  protected openQuickComandaModalForMesa(mesa: Mesa): void {
+    this.feedbackMessage = '';
+    this.editingQuickComanda = null;
+    this.quickComandaInitialMesaId = mesa.id;
+    this.quickComandaModalOpen = true;
+  }
+
+  protected editQuickComanda(comanda: Comanda): void {
+    this.feedbackMessage = '';
+    this.editingQuickComanda = comanda;
+    this.quickComandaInitialMesaId = '';
+    this.quickComandaModalOpen = true;
+  }
+
+  protected closeQuickComandaModal(): void {
+    this.quickComandaModalOpen = false;
+    this.editingQuickComanda = null;
+    this.quickComandaInitialMesaId = '';
+  }
+
+  protected handleQuickComandaSaved(comanda: Comanda): void {
+    const wasEditing = Boolean(this.editingQuickComanda);
+    this.quickComandaModalOpen = false;
+    this.editingQuickComanda = null;
+    this.quickComandaInitialMesaId = '';
+
+    if (comanda.mesaId) {
+      this.feedbackMessage = `Comanda ${wasEditing ? 'atualizada' : 'criada'} para ${comanda.clienteNome ?? 'cliente selecionado'} e vinculada à ${this.getMesaLabel(comanda.mesaId)}.`;
+      return;
+    }
+
+    this.feedbackMessage = `Comanda rápida ${wasEditing ? 'atualizada' : 'criada'} para ${comanda.clienteNome ?? 'cliente selecionado'}.`;
+  }
+
+  protected closeQuickComanda(comanda: Comanda): void {
+    this.comandasService.closeComandaById(comanda.id);
+    this.feedbackMessage = `Comanda de ${comanda.clienteNome ?? 'cliente'} fechada.`;
+  }
+
+  protected getMesaLabel(mesaId: string): string {
+    const mesa = this.mesasService.getMesas().find((currentMesa) => currentMesa.id === mesaId);
+
+    if (!mesa) {
+      return 'mesa selecionada';
+    }
+
+    return `Mesa ${String(mesa.numero).padStart(2, '0')}`;
   }
 
   protected getLivreHelper(): string {

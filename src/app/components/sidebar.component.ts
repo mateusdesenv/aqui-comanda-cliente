@@ -51,6 +51,7 @@ export class SidebarComponent {
     { label: 'Mapa de Comandas', path: '/mapa', icon: 'commandMap' },
     { label: 'Comandas', path: '/comandas', icon: 'receipt' },
     { label: 'Mesas', path: '/mesas', icon: 'table' },
+    { label: 'Clientes', path: '/clientes', icon: 'users' },
     { label: 'Pedidos', path: '/pedidos', icon: 'bell' },
     { label: 'Caixa', path: '/caixa', icon: 'register' },
     { label: 'Cardápio', path: '/cardapio', icon: 'cards' },
