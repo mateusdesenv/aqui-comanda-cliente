@@ -8,6 +8,7 @@ import { MesasService } from '../services/mesas.service';
 import { ProdutosService } from '../services/produtos.service';
 
 type CategoryTab = ProductCategory | 'Todos';
+type ClienteComandaMode = 'cadastrado' | 'manual';
 
 @Component({
   selector: 'app-quick-comanda-modal',
@@ -41,25 +42,72 @@ type CategoryTab = ProductCategory | 'Todos';
           </div>
 
           <p>
-            {{ isEditing ? 'Edite o cliente, a mesa vinculada e os itens desta comanda.' : 'Selecione um cliente, escolha os itens do cardápio e associe a uma mesa quando necessário.' }}
+            {{ isEditing ? 'Edite o responsável, a mesa vinculada e os itens desta comanda.' : 'Selecione um cliente cadastrado ou informe o nome de um cliente não cadastrado.' }}
             Sem mesa, a comanda fica como rápida em aberto.
           </p>
         </header>
 
-        <div class="quick-customer-strip">
-          <label>
-            Cliente responsável pela comanda
-            <select name="cliente" [(ngModel)]="selectedClienteId" [disabled]="!canEditComanda" (ngModelChange)="errorMessage = ''">
-              <option value="">Selecione um cliente</option>
-              @for (cliente of clientes; track cliente.id) {
-                <option [value]="cliente.id">
-                  {{ cliente.nome }} — {{ cliente.cpf }}
-                </option>
-              }
-            </select>
-          </label>
+        <div class="quick-customer-strip enhanced-customer-strip">
+          <fieldset class="customer-mode-card">
+            <legend>Cliente da comanda</legend>
+            <div class="segmented-choice" role="radiogroup" aria-label="Tipo de cliente">
+              <label [class.active]="clienteMode === 'cadastrado'">
+                <input
+                  type="radio"
+                  name="clienteMode"
+                  value="cadastrado"
+                  [(ngModel)]="clienteMode"
+                  [disabled]="!canEditComanda"
+                  (ngModelChange)="onClienteModeChange()"
+                />
+                Cliente cadastrado
+              </label>
+              <label [class.active]="clienteMode === 'manual'">
+                <input
+                  type="radio"
+                  name="clienteMode"
+                  value="manual"
+                  [(ngModel)]="clienteMode"
+                  [disabled]="!canEditComanda"
+                  (ngModelChange)="onClienteModeChange()"
+                />
+                Não cadastrado
+              </label>
+            </div>
 
-          <label>
+            @if (clienteMode === 'cadastrado') {
+              <label>
+                Cliente responsável pela comanda
+                <select name="cliente" [(ngModel)]="selectedClienteId" [disabled]="!canEditComanda" (ngModelChange)="errorMessage = ''">
+                  <option value="">Selecione um cliente</option>
+                  @for (cliente of clientes; track cliente.id) {
+                    <option [value]="cliente.id">
+                      {{ cliente.nome }} — {{ cliente.cpf }}
+                    </option>
+                  }
+                </select>
+              </label>
+            } @else {
+              <label>
+                Nome do cliente não cadastrado
+                <input
+                  type="text"
+                  name="manualClienteNome"
+                  placeholder="Ex.: João da Silva"
+                  [(ngModel)]="manualClienteNome"
+                  [disabled]="!canEditComanda"
+                  (ngModelChange)="errorMessage = ''"
+                />
+              </label>
+              <small>Esse nome será usado apenas nesta comanda. O cliente não será cadastrado automaticamente.</small>
+            }
+
+            <div class="customer-link-indicator" [class.manual]="clienteMode === 'manual'">
+              {{ clienteMode === 'manual' ? 'Comanda com nome manual' : 'Comanda vinculada ao cadastro de clientes' }}
+            </div>
+          </fieldset>
+
+          <label class="quick-mesa-field">
             Mesa vinculada <span class="optional-label">opcional</span>
             <select name="mesa" [(ngModel)]="selectedMesaId" [disabled]="!canEditComanda" (ngModelChange)="errorMessage = ''">
               <option value="">Sem mesa — comanda rápida</option>
@@ -70,15 +118,17 @@ type CategoryTab = ProductCategory | 'Todos';
               }
             </select>
           </label>
-
-          @if (clientes.length === 0) {
-            <div class="quick-helper-box">
-              <strong>Nenhum cliente cadastrado</strong>
-              <span>Cadastre um cliente antes de criar uma comanda.</span>
-              <a routerLink="/clientes" (click)="close.emit()">Ir para Clientes</a>
-            </div>
-          }
         </div>
+
+        @if (clientes.length === 0 && clienteMode === 'cadastrado') {
+          <div class="quick-helper-box quick-client-helper">
+            <div>
+              <strong>Nenhum cliente cadastrado</strong>
+              <span>Use a opção “Não cadastrado” ou cadastre um cliente na base.</span>
+            </div>
+            <a routerLink="/clientes" (click)="close.emit()">Ir para Clientes</a>
+          </div>
+        }
 
         @if (errorMessage) {
           <div class="quick-form-feedback">{{ errorMessage }}</div>
@@ -164,6 +214,7 @@ type CategoryTab = ProductCategory | 'Todos';
             <div class="order-context-card">
               <span>Destino da comanda</span>
               <strong>{{ selectedMesaLabel }}</strong>
+              <em>{{ clienteMode === 'manual' ? 'Cliente não cadastrado' : 'Cliente cadastrado' }}</em>
             </div>
 
             <div class="order-table" role="table" aria-label="Itens selecionados para a comanda">
@@ -233,7 +284,9 @@ export class QuickComandaModalComponent implements OnChanges {
   private readonly produtosService = inject(ProdutosService);
 
   protected activeCategory: CategoryTab = 'Todos';
+  protected clienteMode: ClienteComandaMode = 'cadastrado';
   protected selectedClienteId = '';
+  protected manualClienteNome = '';
   protected selectedMesaId = '';
   protected errorMessage = '';
   protected items: ItemComanda[] = [];
@@ -289,8 +342,16 @@ export class QuickComandaModalComponent implements OnChanges {
     return !this.editingComanda || this.comandasService.isComandaAberta(this.editingComanda);
   }
 
+  protected get hasValidCustomer(): boolean {
+    if (this.clienteMode === 'manual') {
+      return this.manualClienteNome.trim().length >= 2;
+    }
+
+    return Boolean(this.selectedClienteId);
+  }
+
   protected get canSave(): boolean {
-    return this.canEditComanda && Boolean(this.selectedClienteId) && this.items.length > 0;
+    return this.canEditComanda && this.hasValidCustomer && this.items.length > 0;
   }
 
   protected get selectedMesaLabel(): string {
@@ -301,6 +362,16 @@ export class QuickComandaModalComponent implements OnChanges {
     }
 
     return `Mesa ${this.formatMesaNumber(mesa)}${mesa.nome ? ' — ' + mesa.nome : ''}`;
+  }
+
+  protected onClienteModeChange(): void {
+    this.errorMessage = '';
+    if (this.clienteMode === 'manual') {
+      this.selectedClienteId = '';
+      return;
+    }
+
+    this.manualClienteNome = '';
   }
 
   protected setActiveCategory(category: CategoryTab): void {
@@ -405,10 +476,14 @@ export class QuickComandaModalComponent implements OnChanges {
       this.errorMessage = 'Esta comanda já foi finalizada e não pode mais ser alterada.';
       return;
     }
-    const selectedCliente = this.clientes.find((cliente) => cliente.id === this.selectedClienteId);
 
-    if (!selectedCliente) {
-      this.errorMessage = 'Selecione um cliente para vincular à comanda.';
+    const selectedCliente = this.clientes.find((cliente) => cliente.id === this.selectedClienteId);
+    const clienteNome = this.clienteMode === 'manual' ? this.manualClienteNome.trim() : selectedCliente?.nome;
+
+    if (!clienteNome) {
+      this.errorMessage = this.clienteMode === 'manual'
+        ? 'Informe o nome do cliente não cadastrado.'
+        : 'Selecione um cliente para vincular à comanda.';
       return;
     }
 
@@ -418,8 +493,9 @@ export class QuickComandaModalComponent implements OnChanges {
     }
 
     const payload = {
-      clienteId: selectedCliente.id,
-      clienteNome: selectedCliente.nome,
+      clienteId: this.clienteMode === 'manual' ? undefined : selectedCliente?.id,
+      clienteNome,
+      clienteManual: this.clienteMode === 'manual',
       items: this.items,
       mesaId: this.selectedMesaId || undefined,
     };
@@ -459,13 +535,17 @@ export class QuickComandaModalComponent implements OnChanges {
     }, {});
 
     if (this.editingComanda) {
-      this.selectedClienteId = this.editingComanda.clienteId ?? '';
+      this.clienteMode = this.editingComanda.clienteManual || !this.editingComanda.clienteId ? 'manual' : 'cadastrado';
+      this.selectedClienteId = this.clienteMode === 'cadastrado' ? (this.editingComanda.clienteId ?? '') : '';
+      this.manualClienteNome = this.clienteMode === 'manual' ? (this.editingComanda.clienteNome ?? '') : '';
       this.selectedMesaId = this.editingComanda.mesaId ?? '';
       this.items = this.editingComanda.itens.map((item) => ({ ...item }));
       return;
     }
 
+    this.clienteMode = this.clientes.length === 0 ? 'manual' : 'cadastrado';
     this.selectedClienteId = '';
+    this.manualClienteNome = '';
     this.selectedMesaId = this.initialMesaId || '';
     this.items = [];
   }

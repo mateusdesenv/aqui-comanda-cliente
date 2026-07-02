@@ -15,7 +15,7 @@ interface ScaleOption {
     <div class="page-stack settings-page">
       <section class="page-head">
         <div>
-          <h1>Configurações</h1>
+          <h1>Personalizações do sistema</h1>
           <p>Ajuste a experiência visual do sistema para facilitar a operação no dia a dia.</p>
         </div>
       </section>

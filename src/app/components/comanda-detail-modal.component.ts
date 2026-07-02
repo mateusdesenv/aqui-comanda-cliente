@@ -6,6 +6,7 @@ import { ComandasService } from '../services/comandas.service';
 import { ProdutosService } from '../services/produtos.service';
 
 type CategoryTab = ProductCategory | 'Todos';
+type MenuViewMode = 'grid' | 'lista';
 
 @Component({
   selector: 'app-comanda-detail-modal',
@@ -33,79 +34,141 @@ type CategoryTab = ProductCategory | 'Todos';
             ← Voltar ao mapa de comandas
           </button>
 
-          <div class="modal-title-row modal-title-row-with-action">
-            <div class="modal-title-content">
-              <h2 [id]="'comanda-modal-title-' + mesa.id">
-                Mesa {{ displayMesaNumber }} — {{ statusLabel }}
-              </h2>
-              <span
-                class="modal-status-badge"
-                [class.free]="!hasOpenComandas"
-                [class.reserved]="!hasOpenComandas && mesa.status === 'reservada'"
-              >
-                {{ statusBadge }}
-              </span>
-            </div>
-
-            @if (canWrite) {
-              <button class="modal-primary-action modal-header-action" type="button" (click)="createForMesa.emit(mesa)">
-                Adicionar nova comanda
-              </button>
-            }
+          <div class="modal-title-row">
+            <h2 [id]="'comanda-modal-title-' + mesa.id">
+              Mesa {{ displayMesaNumber }} — {{ statusLabel }}
+            </h2>
+            <span
+              class="modal-status-badge"
+              [class.free]="isMesaLivre"
+              [class.reserved]="isMesaReservada"
+              [class.pending-release]="canReleaseMesa"
+            >
+              {{ statusBadge }}
+            </span>
           </div>
 
           <p>
-            Uma mesa pode ter várias comandas. Apenas comandas abertas aceitam lançamento de itens; comandas pagas ficam preservadas como histórico.
+            Selecione uma comanda para lançar itens ou use o card de nova comanda para iniciar outro
+            consumo nesta mesa.
           </p>
+
+          @if (mesaComandas.length > 0) {
+            <div class="mesa-release-action-bar">
+              <div>
+                <strong>Liberar mesa</strong>
+                <span>{{
+                  canReleaseMesa
+                    ? 'Todas as comandas estão pagas. A mesa pode ser liberada.'
+                    : 'Finalize todas as comandas abertas para liberar a mesa.'
+                }}</span>
+              </div>
+              <button
+                class="mesa-release-button"
+                type="button"
+                [disabled]="!canWrite || !canReleaseMesa"
+                (click)="openReleaseMesaConfirmation()"
+              >
+                Liberar mesa
+              </button>
+            </div>
+          }
         </header>
 
         @if (modalFeedback) {
           <div class="quick-form-feedback success-feedback">{{ modalFeedback }}</div>
         }
 
-        @if (mesaComandas.length === 0) {
-          <section class="mesa-empty-state" aria-label="Mesa sem comandas abertas">
-            <div>
-              <strong>Nenhuma comanda nesta mesa</strong>
-              <span>Para lançar itens, crie uma comanda e associe diretamente à Mesa {{ displayMesaNumber }}.</span>
-            </div>
-            @if (canWrite) {
-              <button class="modal-primary-action" type="button" (click)="createForMesa.emit(mesa)">
-                Adicionar nova comanda
+        <section class="mesa-comandas-cards-section" aria-label="Comandas da mesa">
+          <div class="mesa-comandas-card-grid" [class.empty-grid]="mesaComandas.length === 0">
+            @for (comanda of mesaComandas; track comanda.id) {
+              <button
+                class="mesa-comanda-card"
+                [class.active]="isSelectedComanda(comanda)"
+                [class.finalized]="isFinalized(comanda)"
+                type="button"
+                (click)="selectComanda(comanda)"
+              >
+                <div class="mesa-comanda-card-head">
+                  <strong>{{ getComandaCardTitle(comanda) }}</strong>
+                  <span class="mesa-comanda-status" [class.finalized]="isFinalized(comanda)">
+                    {{ getComandaStatusLabel(comanda) }}
+                  </span>
+                </div>
+
+                <span
+                  class="mesa-comanda-client"
+                  [class.registered-client-name]="isRegisteredClienteComanda(comanda)"
+                >{{
+                  comanda.clienteNome || 'Cliente não informado'
+                }}</span>
+
+                <div class="mesa-comanda-card-meta">
+                  <span
+                    >{{ comanda.itens.length }} item{{
+                      comanda.itens.length === 1 ? '' : 's'
+                    }}</span
+                  >
+                  <strong>{{ formatCurrency(getComandaTotal(comanda)) }}</strong>
+                </div>
+
+                <small>Criada em {{ formatDateTime(comanda.createdAt) }}</small>
               </button>
             }
-          </section>
-        } @else {
-          <div class="mesa-comanda-selector">
-            <label>
-              Comandas da mesa
-              <select name="mesaComanda" [(ngModel)]="selectedComandaId" (ngModelChange)="syncSelectedComandaItems()">
-                @for (comanda of mesaComandas; track comanda.id) {
-                  <option [value]="comanda.id">
-                    {{ getComandaLabel(comanda) }} — {{ getComandaStatusLabel(comanda) }} — {{ formatCurrency(getComandaTotal(comanda)) }}
-                  </option>
-                }
-              </select>
-            </label>
 
-            <div class="quick-helper-box mesa-totals-box">
-              <strong>{{ openComandasCount }} aberta{{ openComandasCount === 1 ? '' : 's' }} · {{ finalizedComandasCount }} paga{{ finalizedComandasCount === 1 ? '' : 's' }}</strong>
-              <span>Em aberto: {{ formatCurrency(totalMesaAberto) }}</span>
-              <span>Histórico pago: {{ formatCurrency(totalMesaPago) }}</span>
-            </div>
+            @if (canWrite) {
+              <button
+                class="mesa-add-comanda-card"
+                type="button"
+                aria-label="Adicionar nova comanda para esta mesa"
+                (click)="createComandaForMesa()"
+              >
+                <span aria-hidden="true">+</span>
+                <strong>Nova comanda</strong>
+              </button>
+            } @else if (mesaComandas.length === 0) {
+              <article class="mesa-readonly-empty-card">
+                <strong>Nenhuma comanda nesta mesa</strong>
+                <span>Você tem permissão apenas para visualizar.</span>
+              </article>
+            }
           </div>
+        </section>
 
-          @if (selectedComanda && isFinalized(selectedComanda)) {
+        @if (selectedComanda; as activeComanda) {
+          @if (isFinalized(activeComanda)) {
             <div class="readonly-comanda-alert">
               <strong>Comanda paga/finalizada</strong>
-              <span>Esta comanda está bloqueada para novos itens. Para o mesmo cliente consumir novamente, crie uma nova comanda para esta mesa.</span>
+              <span
+                >Esta comanda está bloqueada para novos itens. Para o mesmo cliente consumir
+                novamente, crie uma nova comanda para esta mesa.</span
+              >
             </div>
           }
 
           <div class="comanda-detail-grid">
             <section class="detail-panel menu-panel" aria-label="Cardápio">
-              <div class="detail-panel-header">
-                <h3>Cardápio</h3>
+              <div class="detail-panel-header menu-panel-toolbar">
+                <div>
+                  <h3>Cardápio</h3>
+                  <span>Alterne a visualização para operar com mais rapidez.</span>
+                </div>
+                <div class="view-toggle" aria-label="Visualização do cardápio">
+                  <button
+                    type="button"
+                    [class.active]="menuViewMode === 'lista'"
+                    (click)="setMenuViewMode('lista')"
+                  >
+                    Lista
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="menuViewMode === 'grid'"
+                    (click)="setMenuViewMode('grid')"
+                  >
+                    Grid
+                  </button>
+                </div>
               </div>
 
               @if (activeProducts.length > 0) {
@@ -124,9 +187,12 @@ type CategoryTab = ProductCategory | 'Todos';
                   }
                 </div>
 
-                <div class="product-grid">
+                <div class="product-grid" [class.product-list-view]="menuViewMode === 'lista'">
                   @for (produto of filteredProducts; track produto.id) {
-                    <article class="product-card" [class.product-card-disabled]="!canEditSelectedComanda">
+                    <article
+                      class="product-card"
+                      [class.product-card-disabled]="!canEditSelectedComanda"
+                    >
                       <div>
                         <strong>{{ produto.nome }}</strong>
                         <p>{{ produto.descricao }}</p>
@@ -135,7 +201,10 @@ type CategoryTab = ProductCategory | 'Todos';
                       <span class="product-price">{{ formatCurrency(produto.preco) }}</span>
 
                       <div class="product-actions">
-                        <div class="quantity-control" [attr.aria-label]="'Quantidade de ' + produto.nome">
+                        <div
+                          class="quantity-control"
+                          [attr.aria-label]="'Quantidade de ' + produto.nome"
+                        >
                           <button
                             type="button"
                             aria-label="Diminuir quantidade"
@@ -155,7 +224,12 @@ type CategoryTab = ProductCategory | 'Todos';
                           </button>
                         </div>
 
-                        <button class="add-product-button" type="button" [disabled]="!canEditSelectedComanda" (click)="addItem(produto)">
+                        <button
+                          class="add-product-button"
+                          type="button"
+                          [disabled]="!canEditSelectedComanda"
+                          (click)="addItem(produto)"
+                        >
                           Adicionar
                         </button>
                       </div>
@@ -175,12 +249,21 @@ type CategoryTab = ProductCategory | 'Todos';
               <div class="detail-panel-header order-header">
                 <h3>Itens da comanda</h3>
                 <div class="order-header-actions">
-                  @if (selectedComanda && canEditSelectedComanda && items.length > 0) {
-                    <button class="finish-comanda-button" type="button" (click)="openFinishConfirmation(selectedComanda)">
+                  @if (canEditSelectedComanda && items.length > 0) {
+                    <button
+                      class="finish-comanda-button"
+                      type="button"
+                      (click)="openFinishConfirmation(activeComanda)"
+                    >
                       Finalizar comanda
                     </button>
                   }
-                  <button class="clear-order-button" type="button" [disabled]="!canEditSelectedComanda" (click)="clearComanda()">
+                  <button
+                    class="clear-order-button"
+                    type="button"
+                    [disabled]="!canEditSelectedComanda"
+                    (click)="clearComanda()"
+                  >
                     Limpar comanda
                   </button>
                 </div>
@@ -188,10 +271,8 @@ type CategoryTab = ProductCategory | 'Todos';
 
               <div class="order-context-card">
                 <span>Comanda selecionada</span>
-                <strong>{{ getComandaLabel(selectedComanda) }}</strong>
-                @if (selectedComanda) {
-                  <em>{{ getComandaStatusLabel(selectedComanda) }}</em>
-                }
+                <strong [class.registered-client-name]="isRegisteredClienteComanda(activeComanda)">{{ getComandaLabel(activeComanda) }}</strong>
+                <em>{{ getComandaStatusLabel(activeComanda) }}</em>
               </div>
 
               <div class="order-table" role="table" aria-label="Itens lançados na comanda">
@@ -207,28 +288,56 @@ type CategoryTab = ProductCategory | 'Todos';
                   @for (item of items; track item.id) {
                     <div class="order-item-row" role="row">
                       <strong role="cell">{{ item.nome }}</strong>
-                      <div role="cell" class="inline-quantity-control" [attr.aria-label]="'Quantidade de ' + item.nome">
-                        <button type="button" aria-label="Diminuir item" [disabled]="!canEditSelectedComanda" (click)="changeItemQuantity(item, item.quantidade - 1)">-</button>
+                      <div
+                        role="cell"
+                        class="inline-quantity-control"
+                        [attr.aria-label]="'Quantidade de ' + item.nome"
+                      >
+                        <button
+                          type="button"
+                          aria-label="Diminuir item"
+                          [disabled]="!canEditSelectedComanda"
+                          (click)="changeItemQuantity(item, item.quantidade - 1)"
+                        >
+                          -
+                        </button>
                         <span>{{ item.quantidade }}</span>
-                        <button type="button" aria-label="Aumentar item" [disabled]="!canEditSelectedComanda" (click)="changeItemQuantity(item, item.quantidade + 1)">+</button>
+                        <button
+                          type="button"
+                          aria-label="Aumentar item"
+                          [disabled]="!canEditSelectedComanda"
+                          (click)="changeItemQuantity(item, item.quantidade + 1)"
+                        >
+                          +
+                        </button>
                       </div>
                       <span role="cell">{{ formatCurrency(item.precoUnitario) }}</span>
                       <span role="cell">{{ formatCurrency(item.subtotal) }}</span>
-                      <button type="button" [disabled]="!canEditSelectedComanda" (click)="removeItem(item)">Remover</button>
+                      <button
+                        type="button"
+                        [disabled]="!canEditSelectedComanda"
+                        (click)="removeItem(item)"
+                      >
+                        Remover
+                      </button>
                     </div>
                   } @empty {
                     <div class="empty-order-state">
                       <strong>Nenhum item lançado</strong>
-                      <span>Escolha produtos do cardápio para adicionar à comanda selecionada.</span>
+                      <span
+                        >Escolha produtos do cardápio para adicionar à comanda selecionada.</span
+                      >
                     </div>
                   }
                 </div>
               </div>
 
               <footer class="order-total-panel">
-                <span>{{ selectedComanda && isFinalized(selectedComanda) ? 'TOTAL FINALIZADO' : 'TOTAL DA COMANDA' }}</span>
+                <span>{{
+                  isFinalized(activeComanda) ? 'TOTAL FINALIZADO' : 'TOTAL DA COMANDA'
+                }}</span>
                 <strong>{{ formatCurrency(getTotal()) }}</strong>
-                @if (selectedComanda?.finalizadaEm; as finalizadaEm) {
+                @if (activeComanda.finalizadaEm; as finalizadaEm) {
                   <small>Finalizada em {{ formatDateTime(finalizadaEm) }}</small>
                 }
               </footer>
@@ -238,14 +347,22 @@ type CategoryTab = ProductCategory | 'Todos';
       </section>
 
       @if (finishCandidate) {
-        <section class="confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="finish-comanda-title">
+        <section
+          class="confirmation-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="finish-comanda-title"
+        >
           <div class="confirmation-card">
             <h3 id="finish-comanda-title">Finalizar comanda</h3>
-            <p>Confirme o encerramento. Depois de paga, esta comanda não poderá receber novos itens ou alterações.</p>
+            <p>
+              Confirme o encerramento. Depois de paga, esta comanda não poderá receber novos itens
+              ou alterações.
+            </p>
 
             <div class="confirmation-summary">
               <span>Cliente</span>
-              <strong>{{ finishCandidate.clienteNome || 'Cliente não informado' }}</strong>
+              <strong [class.registered-client-name]="isRegisteredClienteComanda(finishCandidate)">{{ finishCandidate.clienteNome || 'Cliente não informado' }}</strong>
 
               <span>Mesa</span>
               <strong>Mesa {{ displayMesaNumber }}</strong>
@@ -264,8 +381,61 @@ type CategoryTab = ProductCategory | 'Todos';
             </div>
 
             <div class="confirmation-actions">
-              <button class="modal-secondary-action" type="button" (click)="cancelFinishConfirmation()">Cancelar</button>
-              <button class="modal-primary-action" type="button" (click)="confirmFinishComanda()">Encerrar e marcar como paga</button>
+              <button
+                class="modal-secondary-action"
+                type="button"
+                (click)="cancelFinishConfirmation()"
+              >
+                Cancelar
+              </button>
+              <button class="modal-primary-action" type="button" (click)="confirmFinishComanda()">
+                Encerrar e marcar como paga
+              </button>
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (releaseMesaConfirmationOpen) {
+        <section
+          class="confirmation-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="release-mesa-title"
+        >
+          <div class="confirmation-card">
+            <h3 id="release-mesa-title">Liberar mesa</h3>
+            <p>
+              Todas as comandas desta mesa estão pagas. Deseja liberar a mesa para um novo
+              atendimento?
+            </p>
+
+            <div class="confirmation-summary">
+              <span>Mesa</span>
+              <strong>Mesa {{ displayMesaNumber }}</strong>
+
+              <span>Comandas pagas</span>
+              <strong>{{ mesaComandas.length }}</strong>
+
+              <span>Histórico</span>
+              <strong>Será preservado</strong>
+            </div>
+
+            <p class="confirmation-note">
+              As entradas já registradas no caixa não serão alteradas.
+            </p>
+
+            <div class="confirmation-actions">
+              <button
+                class="modal-secondary-action"
+                type="button"
+                (click)="cancelReleaseMesaConfirmation()"
+              >
+                Cancelar
+              </button>
+              <button class="modal-primary-action" type="button" (click)="confirmReleaseMesa()">
+                Liberar mesa
+              </button>
             </div>
           </div>
         </section>
@@ -274,6 +444,7 @@ type CategoryTab = ProductCategory | 'Todos';
   `,
 })
 export class ComandaDetailModalComponent implements OnChanges {
+  private lastMesaId = '';
   @Input({ required: true }) mesa!: Mesa;
   @Input() canWrite = true;
   @Output() close = new EventEmitter<void>();
@@ -283,19 +454,31 @@ export class ComandaDetailModalComponent implements OnChanges {
   private readonly produtosService = inject(ProdutosService);
 
   protected activeCategory: CategoryTab = 'Todos';
+  protected menuViewMode: MenuViewMode = 'grid';
   protected selectedComandaId = '';
   protected items: ItemComanda[] = [];
   protected productQuantities: Record<string, number> = {};
   protected finishCandidate: Comanda | null = null;
+  protected releaseMesaConfirmationOpen = false;
   protected modalFeedback = '';
 
   ngOnChanges(): void {
+    const mesaChanged = this.mesa.id !== this.lastMesaId;
+    this.lastMesaId = this.mesa.id;
+
+    if (mesaChanged || !this.isSelectedComandaFromCurrentMesa()) {
+      this.selectFirstOpenComandaForMesa();
+    }
+
     this.syncSelectedComandaItems();
 
-    this.productQuantities = this.activeProducts.reduce<Record<string, number>>((quantities, produto) => {
-      quantities[produto.id] = this.productQuantities[produto.id] ?? 1;
-      return quantities;
-    }, {});
+    this.productQuantities = this.activeProducts.reduce<Record<string, number>>(
+      (quantities, produto) => {
+        quantities[produto.id] = this.productQuantities[produto.id] ?? 1;
+        return quantities;
+      },
+      {},
+    );
 
     if (!this.categories.includes(this.activeCategory)) {
       this.activeCategory = 'Todos';
@@ -310,32 +493,16 @@ export class ComandaDetailModalComponent implements OnChanges {
     return this.comandasService.getOpenComandasForMesa(this.mesa.id);
   }
 
-  protected get finalizedMesaComandas(): Comanda[] {
-    return this.comandasService.getFinishedComandasForMesa(this.mesa.id);
-  }
-
   protected get selectedComanda(): Comanda | null {
     return this.mesaComandas.find((comanda) => comanda.id === this.selectedComandaId) ?? null;
   }
 
-  protected get totalMesaAberto(): number {
-    return this.openMesaComandas.reduce((total, comanda) => total + comanda.total, 0);
-  }
-
-  protected get totalMesaPago(): number {
-    return this.finalizedMesaComandas.reduce((total, comanda) => total + this.getComandaTotal(comanda), 0);
-  }
-
-  protected get openComandasCount(): number {
-    return this.openMesaComandas.length;
-  }
-
-  protected get finalizedComandasCount(): number {
-    return this.finalizedMesaComandas.length;
-  }
-
   protected get canEditSelectedComanda(): boolean {
-    return this.canWrite && Boolean(this.selectedComanda) && this.comandasService.isComandaAberta(this.selectedComanda!);
+    return (
+      this.canWrite &&
+      Boolean(this.selectedComanda) &&
+      this.comandasService.isComandaAberta(this.selectedComanda!)
+    );
   }
 
   protected get activeProducts(): Produto[] {
@@ -366,8 +533,24 @@ export class ComandaDetailModalComponent implements OnChanges {
     return this.openMesaComandas.length > 0;
   }
 
+  protected get hasMesaComandas(): boolean {
+    return this.mesaComandas.length > 0;
+  }
+
+  protected get canReleaseMesa(): boolean {
+    return this.comandasService.canReleaseMesa(this.mesa.id);
+  }
+
+  protected get isMesaLivre(): boolean {
+    return this.statusLabel === 'Livre';
+  }
+
+  protected get isMesaReservada(): boolean {
+    return this.statusLabel === 'Reservada';
+  }
+
   protected get statusLabel(): string {
-    if (this.hasOpenComandas) {
+    if (this.hasMesaComandas) {
       return 'Ocupada';
     }
 
@@ -375,11 +558,36 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected get statusBadge(): string {
+    if (this.canReleaseMesa) {
+      return 'TODAS PAGAS';
+    }
+
     return this.statusLabel.toUpperCase();
   }
 
   protected setActiveCategory(category: CategoryTab): void {
     this.activeCategory = category;
+  }
+
+  protected setMenuViewMode(mode: MenuViewMode): void {
+    this.menuViewMode = mode;
+  }
+
+  protected selectComanda(comanda: Comanda): void {
+    this.selectedComandaId = comanda.id;
+    this.syncSelectedComandaItems();
+  }
+
+  protected isSelectedComanda(comanda: Comanda): boolean {
+    return this.selectedComandaId === comanda.id;
+  }
+
+  protected createComandaForMesa(): void {
+    if (!this.canWrite) {
+      return;
+    }
+
+    this.createForMesa.emit(this.mesa);
   }
 
   protected getQuantity(produto: Produto): number {
@@ -477,10 +685,16 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected syncSelectedComandaItems(): void {
-    const currentSelection = this.selectedComanda;
-    const selected = currentSelection ?? this.mesaComandas[0] ?? null;
-    this.selectedComandaId = selected?.id ?? '';
-    this.items = selected ? selected.itens.map((item) => ({ ...item })) : [];
+    const selected = this.selectedComanda;
+
+    if (!selected) {
+      this.selectedComandaId = '';
+      this.items = [];
+      this.modalFeedback = '';
+      return;
+    }
+
+    this.items = selected.itens.map((item) => ({ ...item }));
     this.modalFeedback = '';
   }
 
@@ -493,27 +707,43 @@ export class ComandaDetailModalComponent implements OnChanges {
       return comanda.clienteNome;
     }
 
-    return `Comanda ${this.mesaComandas.findIndex((item) => item.id === comanda.id) + 1}`;
+    return this.getComandaCardTitle(comanda);
+  }
+
+  protected getComandaCardTitle(comanda: Comanda): string {
+    const index = this.mesaComandas.findIndex((item) => item.id === comanda.id) + 1;
+    return `Comanda ${index || 1}`;
   }
 
   protected getComandaStatusLabel(comanda: Comanda): string {
-    return this.comandasService.isComandaFinalizada(comanda) ? 'Paga / finalizada' : 'Aberta';
+    return this.comandasService.isComandaFinalizada(comanda) ? 'Paga' : 'Aberta';
   }
 
   protected getComandaTotal(comanda: Comanda): number {
-    return this.comandasService.isComandaFinalizada(comanda) ? comanda.totalFinalizado ?? comanda.total : comanda.total;
+    return this.comandasService.isComandaFinalizada(comanda)
+      ? (comanda.totalFinalizado ?? comanda.total)
+      : comanda.total;
   }
 
   protected isFinalized(comanda: Comanda): boolean {
     return this.comandasService.isComandaFinalizada(comanda);
   }
 
+  protected isRegisteredClienteComanda(comanda: Comanda | null): boolean {
+    return Boolean(comanda?.clienteId);
+  }
+
+
   protected openFinishConfirmation(comanda: Comanda): void {
     if (!this.canEditSelectedComanda || this.items.length === 0) {
       return;
     }
 
-    this.finishCandidate = { ...comanda, itens: this.items.map((item) => ({ ...item })), total: this.getTotal() };
+    this.finishCandidate = {
+      ...comanda,
+      itens: this.items.map((item) => ({ ...item })),
+      total: this.getTotal(),
+    };
   }
 
   protected cancelFinishConfirmation(): void {
@@ -529,7 +759,8 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.finishCandidate = null;
 
     if (!finalized) {
-      this.modalFeedback = 'Não foi possível finalizar esta comanda. Verifique se ela ainda está aberta e possui itens.';
+      this.modalFeedback =
+        'Não foi possível finalizar esta comanda. Verifique se ela ainda está aberta e possui itens.';
       this.syncSelectedComandaItems();
       return;
     }
@@ -537,6 +768,38 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.selectedComandaId = finalized.id;
     this.items = finalized.itens.map((item) => ({ ...item }));
     this.modalFeedback = `Comanda de ${finalized.clienteNome ?? 'cliente'} finalizada, marcada como paga e registrada no caixa.`;
+  }
+
+  protected openReleaseMesaConfirmation(): void {
+    if (!this.canWrite || !this.canReleaseMesa) {
+      return;
+    }
+
+    this.releaseMesaConfirmationOpen = true;
+  }
+
+  protected cancelReleaseMesaConfirmation(): void {
+    this.releaseMesaConfirmationOpen = false;
+  }
+
+  protected confirmReleaseMesa(): void {
+    if (!this.canWrite || !this.canReleaseMesa) {
+      return;
+    }
+
+    const released = this.comandasService.releaseMesa(this.mesa.id);
+    this.releaseMesaConfirmationOpen = false;
+
+    if (!released) {
+      this.modalFeedback =
+        'Não foi possível liberar a mesa. Verifique se todas as comandas estão pagas.';
+      return;
+    }
+
+    this.selectedComandaId = '';
+    this.items = [];
+    this.finishCandidate = null;
+    this.modalFeedback = 'Mesa liberada para um novo atendimento. O histórico pago foi preservado.';
   }
 
   protected getTotal(): number {
@@ -557,6 +820,19 @@ export class ComandaDetailModalComponent implements OnChanges {
     }).format(new Date(value));
   }
 
+  private isSelectedComandaFromCurrentMesa(): boolean {
+    if (!this.selectedComandaId) {
+      return true;
+    }
+
+    return this.mesaComandas.some((comanda) => comanda.id === this.selectedComandaId);
+  }
+
+  private selectFirstOpenComandaForMesa(): void {
+    const firstOpenComanda = this.openMesaComandas[0];
+    this.selectedComandaId = firstOpenComanda?.id ?? '';
+  }
+
   private persistItems(): void {
     if (!this.selectedComandaId || !this.canEditSelectedComanda) {
       return;
@@ -565,7 +841,11 @@ export class ComandaDetailModalComponent implements OnChanges {
     const currentId = this.selectedComandaId;
     this.comandasService.saveItemsForComanda(currentId, this.items);
 
-    if (!this.comandasService.getComandasForMesa(this.mesa.id).some((comanda) => comanda.id === currentId)) {
+    if (
+      !this.comandasService
+        .getComandasForMesa(this.mesa.id)
+        .some((comanda) => comanda.id === currentId)
+    ) {
       this.selectedComandaId = '';
     }
   }

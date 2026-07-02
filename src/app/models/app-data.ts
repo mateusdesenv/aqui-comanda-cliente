@@ -99,8 +99,10 @@ export interface EntradaCaixa {
 export interface Comanda {
   id: string;
   mesaId?: string;
+  mesaLiberadaEm?: string;
   clienteId?: string;
   clienteNome?: string;
+  clienteManual?: boolean;
   tipo?: ComandaTipo;
   status: ComandaStatus;
   paga: boolean;
@@ -165,14 +167,10 @@ export interface MapaMesaCard {
   status: MapaMesaStatus;
   total: number;
   totalComandas: number;
+  mesaLiberacaoPendente?: boolean;
 }
 
-export const productCategories: ProductCategory[] = [
-  'Lanches',
-  'Bebidas',
-  'Porções',
-  'Sobremesas',
-];
+export const productCategories: ProductCategory[] = ['Lanches', 'Bebidas', 'Porções', 'Sobremesas'];
 
 export const telasSistema: TelaPermissaoConfig[] = [
   { tela: 'mapa', label: 'Dashboard / Mapa', path: '/mapa' },
@@ -183,6 +181,6 @@ export const telasSistema: TelaPermissaoConfig[] = [
   { tela: 'caixa', label: 'Caixa', path: '/caixa' },
   { tela: 'cardapio', label: 'Cardápio / Produtos', path: '/cardapio' },
   { tela: 'relatorios', label: 'Relatórios', path: '/relatorios' },
-  { tela: 'configuracoes', label: 'Configurações', path: '/configuracoes' },
+  { tela: 'configuracoes', label: 'Configurações', path: '/configuracoes/personalizacoes' },
   { tela: 'colaboradores', label: 'Colaboradores', path: '/colaboradores' },
 ];

@@ -86,7 +86,7 @@ import { AuthService } from '../services/auth.service';
             @for (comanda of quickComandas; track comanda.id) {
               <article class="quick-comanda-card">
                 <div>
-                  <strong>{{ comanda.clienteNome || 'Cliente não informado' }}</strong>
+                  <strong [class.registered-client-name]="isRegisteredClienteComanda(comanda)">{{ comanda.clienteNome || 'Cliente não informado' }}</strong>
                   <small>{{ comanda.itens.length }} itens lançados · sem mesa</small>
                 </div>
                 <span>{{ formatCurrency(comanda.total) }}</span>
@@ -142,7 +142,7 @@ import { AuthService } from '../services/auth.service';
 
             <div class="confirmation-summary">
               <span>Cliente</span>
-              <strong>{{ quickFinishCandidate.clienteNome || 'Cliente não informado' }}</strong>
+              <strong [class.registered-client-name]="isRegisteredClienteComanda(quickFinishCandidate)">{{ quickFinishCandidate.clienteNome || 'Cliente não informado' }}</strong>
 
               <span>Tipo</span>
               <strong>Comanda rápida sem mesa</strong>
@@ -339,6 +339,11 @@ export class MapaComandasPageComponent {
 
     return `Mesa ${String(mesa.numero).padStart(2, '0')}`;
   }
+
+  protected isRegisteredClienteComanda(comanda: Comanda | null): boolean {
+    return Boolean(comanda?.clienteId);
+  }
+
 
   protected getLivreHelper(): string {
     return `${this.getPercent(this.resumo.livres)}% das mesas ativas`;

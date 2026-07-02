@@ -22,10 +22,15 @@ import { MapaMesaCard } from '../models/app-data';
       <span class="comanda-number">{{ displayNumber }}</span>
       <span class="comanda-status">{{ statusLabel }}</span>
       @if (card.status === 'ocupada') {
-        <span class="comanda-count">{{ card.totalComandas }} comanda{{ card.totalComandas === 1 ? '' : 's' }}</span>
-        <strong class="comanda-total">
-          Total {{ card.total | currency: 'BRL':'symbol':'1.2-2':'pt-BR' }}
-        </strong>
+        @if (card.mesaLiberacaoPendente) {
+          <span class="comanda-count">Todas pagas</span>
+          <strong class="comanda-total">Aguardando liberação</strong>
+        } @else {
+          <span class="comanda-count">{{ card.totalComandas }} comanda{{ card.totalComandas === 1 ? '' : 's' }}</span>
+          <strong class="comanda-total">
+            Total {{ card.total | currency: 'BRL':'symbol':'1.2-2':'pt-BR' }}
+          </strong>
+        }
       }
     </button>
   `,
@@ -50,7 +55,8 @@ export class ComandaCardComponent {
   }
 
   protected get ariaLabel(): string {
-    const comandas = this.card.totalComandas ? `, ${this.card.totalComandas} comanda${this.card.totalComandas === 1 ? '' : 's'} aberta${this.card.totalComandas === 1 ? '' : 's'}` : '';
-    return `Mesa ${this.displayNumber} ${this.statusLabel.toLowerCase()}${comandas}`;
+    const comandas = this.card.totalComandas ? `, ${this.card.totalComandas} comanda${this.card.totalComandas === 1 ? '' : 's'} no ciclo atual` : '';
+    const liberacao = this.card.mesaLiberacaoPendente ? ', todas pagas e aguardando liberação' : '';
+    return `Mesa ${this.displayNumber} ${this.statusLabel.toLowerCase()}${comandas}${liberacao}`;
   }
 }
