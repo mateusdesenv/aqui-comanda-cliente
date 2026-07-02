@@ -2,10 +2,12 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IconComponent } from '../components/icon.component';
 import { StatCardComponent } from '../components/stat-card.component';
-import { CaixaDateFilter, EntradaCaixa } from '../models/app-data';
+import { AuthService } from '../services/auth.service';
+import { CaixaDateFilter, EntradaCaixa, SessaoCaixa } from '../models/app-data';
 import { CaixaService } from '../services/caixa.service';
 
 type CaixaTipoFilter = 'todos' | 'comanda';
+type CaixaViewMode = 'lista' | 'grid';
 
 @Component({
   selector: 'app-caixa-page',
@@ -27,6 +29,49 @@ type CaixaTipoFilter = 'todos' | 'comanda';
             [(ngModel)]="search"
           />
         </label>
+      </section>
+
+      @if (feedbackMessage) {
+        <section class="form-feedback success">{{ feedbackMessage }}</section>
+      }
+
+      @if (errorMessage) {
+        <section class="form-feedback">{{ errorMessage }}</section>
+      }
+
+      <section class="caixa-session-card" [class.closed]="!sessaoAberta">
+        <div>
+          <span class="settings-current-badge">{{ sessaoAberta ? 'Caixa aberto' : 'Caixa fechado' }}</span>
+          <h2>{{ sessaoAberta ? 'Sessão de caixa em andamento' : 'Nenhum caixa aberto' }}</h2>
+          <p>
+            {{ sessaoAberta
+              ? 'Pagamentos de comandas finalizadas serão vinculados a esta sessão.'
+              : 'Abra o caixa para registrar pagamentos de comandas.' }}
+          </p>
+          @if (sessaoAberta) {
+            <small>
+              Aberto em {{ formatDateTime(sessaoAberta.abertoEm) }}
+              @if (sessaoAberta.abertoPorNome) {
+                · por {{ sessaoAberta.abertoPorNome }}
+              }
+            </small>
+          }
+        </div>
+
+        <div class="caixa-session-actions">
+          @if (!sessaoAberta) {
+            <button class="primary-action-button" type="button" [disabled]="!canWriteCaixa" (click)="openAbrirCaixaModal()">
+              Abrir caixa
+            </button>
+          } @else {
+            <button class="secondary-button" type="button" [disabled]="!canWriteCaixa" (click)="openFecharCaixaModal()">
+              Fechar caixa
+            </button>
+          }
+          @if (!canWriteCaixa) {
+            <span class="readonly-chip">Somente leitura</span>
+          }
+        </div>
       </section>
 
       <section class="caixa-filters" aria-label="Filtros do caixa">
@@ -69,6 +114,14 @@ type CaixaTipoFilter = 'todos' | 'comanda';
           </select>
         </label>
 
+        <label>
+          Visualização
+          <select name="caixaVisualizacao" [(ngModel)]="viewMode">
+            <option value="lista">Lista</option>
+            <option value="grid">Grid</option>
+          </select>
+        </label>
+
         <button class="clear-filters-button" type="button" (click)="clearFilters()">
           Limpar filtros
         </button>
@@ -87,9 +140,14 @@ type CaixaTipoFilter = 'todos' | 'comanda';
             <h2>Entradas financeiras</h2>
             <span>{{ filteredEntradas.length }} entradas exibidas · {{ entradas.length }} registradas</span>
           </div>
+
+          <div class="view-toggle-group" aria-label="Alternar visualização do caixa">
+            <button type="button" [class.active]="viewMode === 'lista'" (click)="viewMode = 'lista'">Lista</button>
+            <button type="button" [class.active]="viewMode === 'grid'" (click)="viewMode = 'grid'">Grid</button>
+          </div>
         </div>
 
-        <div class="caixa-entries-list">
+        <div class="caixa-entries-list" [class.grid-view]="viewMode === 'grid'">
           @for (entrada of filteredEntradas; track entrada.id) {
             <article class="caixa-entry-card">
               <header>
@@ -129,20 +187,122 @@ type CaixaTipoFilter = 'todos' | 'comanda';
           }
         </div>
       </section>
+
+      @if (abrirCaixaModalOpen) {
+        <div class="comanda-modal-overlay" role="presentation">
+          <section class="management-modal-card caixa-session-modal" role="dialog" aria-modal="true" aria-labelledby="abrir-caixa-title">
+            <button class="modal-close-button" type="button" aria-label="Cancelar abertura de caixa" (click)="closeCaixaModals()">X</button>
+            <header class="management-modal-header">
+              <h2 id="abrir-caixa-title">Abrir caixa</h2>
+              <p>Confirme a abertura para começar a registrar pagamentos de comandas.</p>
+            </header>
+
+            <div class="caixa-session-summary">
+              <div><span>Data/hora</span><strong>{{ formatDateTime(nowIso) }}</strong></div>
+              <div><span>Responsável</span><strong>{{ currentUserName }}</strong></div>
+            </div>
+
+            <label class="modal-field-block">
+              Observação <span class="optional-label">opcional</span>
+              <textarea rows="4" name="observacaoAbertura" placeholder="Ex.: Caixa iniciado no turno da noite" [(ngModel)]="observacaoAbertura"></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button class="primary-action-button" type="button" (click)="confirmAbrirCaixa()">Abrir caixa</button>
+              <button class="ghost-button" type="button" (click)="closeCaixaModals()">Cancelar</button>
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (fecharCaixaModalOpen && sessaoAberta) {
+        <div class="comanda-modal-overlay" role="presentation">
+          <section class="management-modal-card caixa-session-modal" role="dialog" aria-modal="true" aria-labelledby="fechar-caixa-title">
+            <button class="modal-close-button" type="button" aria-label="Cancelar fechamento de caixa" (click)="closeCaixaModals()">X</button>
+            <header class="management-modal-header">
+              <h2 id="fechar-caixa-title">Fechar caixa</h2>
+              <p>Revise o resumo da sessão antes de confirmar o fechamento.</p>
+            </header>
+
+            <div class="caixa-session-summary">
+              <div><span>Aberto em</span><strong>{{ formatDateTime(sessaoAberta.abertoEm) }}</strong></div>
+              <div><span>Aberto por</span><strong>{{ sessaoAberta.abertoPorNome || 'Não informado' }}</strong></div>
+              <div><span>Total de entradas</span><strong>{{ formatCurrency(totalSessaoAberta) }}</strong></div>
+              <div><span>Quantidade</span><strong>{{ entradasSessaoAberta.length }} entradas</strong></div>
+            </div>
+
+            @if (entradasPorFormaPagamentoSessao.length > 0) {
+              <div class="caixa-payment-summary">
+                @for (item of entradasPorFormaPagamentoSessao; track item.forma) {
+                  <div>
+                    <span>{{ item.forma }}</span>
+                    <strong>{{ formatCurrency(item.total) }}</strong>
+                    <small>{{ item.quantidade }} entradas</small>
+                  </div>
+                }
+              </div>
+            }
+
+            <label class="modal-field-block">
+              Observação <span class="optional-label">opcional</span>
+              <textarea rows="4" name="observacaoFechamento" placeholder="Observação do fechamento" [(ngModel)]="observacaoFechamento"></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button class="primary-action-button" type="button" (click)="confirmFecharCaixa()">Fechar caixa</button>
+              <button class="ghost-button" type="button" (click)="closeCaixaModals()">Cancelar</button>
+            </div>
+          </section>
+        </div>
+      }
     </div>
   `,
 })
 export class CaixaPageComponent {
   private readonly caixaService = inject(CaixaService);
+  private readonly authService = inject(AuthService);
 
   protected search = '';
   protected dateFilter: CaixaDateFilter = 'todas';
   protected paymentFilter = 'todos';
   protected mesaFilter = 'todos';
   protected tipoFilter: CaixaTipoFilter = 'todos';
+  protected viewMode: CaixaViewMode = 'lista';
+  protected abrirCaixaModalOpen = false;
+  protected fecharCaixaModalOpen = false;
+  protected observacaoAbertura = '';
+  protected observacaoFechamento = '';
+  protected feedbackMessage = '';
+  protected errorMessage = '';
+  protected nowIso = new Date().toISOString();
+
+  protected get canWriteCaixa(): boolean {
+    return this.authService.canWrite('caixa');
+  }
+
+  protected get currentUserName(): string {
+    return this.authService.currentUser()?.nome ?? 'Usuário atual';
+  }
+
+  protected get sessaoAberta(): SessaoCaixa | null {
+    return this.caixaService.getSessaoAberta();
+  }
 
   protected get entradas(): EntradaCaixa[] {
     return this.caixaService.getEntradas();
+  }
+
+  protected get entradasSessaoAberta(): EntradaCaixa[] {
+    const sessao = this.sessaoAberta;
+    return sessao ? this.caixaService.getEntradasBySessao(sessao.id) : [];
+  }
+
+  protected get totalSessaoAberta(): number {
+    return this.caixaService.getTotalRecebido(this.entradasSessaoAberta);
+  }
+
+  protected get entradasPorFormaPagamentoSessao(): Array<{ forma: string; total: number; quantidade: number }> {
+    return this.caixaService.getEntradasPorFormaPagamento(this.entradasSessaoAberta);
   }
 
   protected get formasPagamento(): string[] {
@@ -229,6 +389,68 @@ export class CaixaPageComponent {
     this.tipoFilter = 'todos';
   }
 
+  protected openAbrirCaixaModal(): void {
+    if (!this.canWriteCaixa) {
+      this.errorMessage = 'Você não tem permissão para abrir o caixa.';
+      return;
+    }
+
+    this.clearMessages();
+    this.nowIso = new Date().toISOString();
+    this.observacaoAbertura = '';
+    this.abrirCaixaModalOpen = true;
+  }
+
+  protected openFecharCaixaModal(): void {
+    if (!this.canWriteCaixa) {
+      this.errorMessage = 'Você não tem permissão para fechar o caixa.';
+      return;
+    }
+
+    this.clearMessages();
+    this.observacaoFechamento = '';
+    this.fecharCaixaModalOpen = true;
+  }
+
+  protected closeCaixaModals(): void {
+    this.abrirCaixaModalOpen = false;
+    this.fecharCaixaModalOpen = false;
+  }
+
+  protected confirmAbrirCaixa(): void {
+    if (!this.canWriteCaixa) {
+      this.errorMessage = 'Você não tem permissão para abrir o caixa.';
+      return;
+    }
+
+    const sessao = this.caixaService.abrirCaixa(this.observacaoAbertura, this.authService.currentUser());
+    this.closeCaixaModals();
+
+    if (!sessao) {
+      this.errorMessage = 'Já existe um caixa aberto.';
+      return;
+    }
+
+    this.feedbackMessage = 'Caixa aberto com sucesso.';
+  }
+
+  protected confirmFecharCaixa(): void {
+    if (!this.canWriteCaixa) {
+      this.errorMessage = 'Você não tem permissão para fechar o caixa.';
+      return;
+    }
+
+    const sessao = this.caixaService.fecharCaixa(this.observacaoFechamento, this.authService.currentUser());
+    this.closeCaixaModals();
+
+    if (!sessao) {
+      this.errorMessage = 'Não existe caixa aberto para fechar.';
+      return;
+    }
+
+    this.feedbackMessage = `Caixa fechado com ${this.formatCurrency(sessao.totalEntradas)} em entradas.`;
+  }
+
   protected getTipoLabel(entrada: EntradaCaixa): string {
     return entrada.tipo === 'comanda' ? 'Comanda paga' : entrada.tipo;
   }
@@ -284,5 +506,10 @@ export class CaixaPageComponent {
 
   private getStartOfDay(date: Date): Date {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private clearMessages(): void {
+    this.feedbackMessage = '';
+    this.errorMessage = '';
   }
 }

@@ -1,8 +1,12 @@
-import { Component, inject } from '@angular/core';
+import { Component, HostListener, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { ProductCategory, Produto } from '../models/app-data';
 import { ProdutoPayload, ProdutosService } from '../services/produtos.service';
+
+type ProdutoStatusFilter = 'todos' | 'ativo' | 'inativo';
+type ProdutoDescriptionFilter = 'todos' | 'com_descricao' | 'sem_descricao';
+type ProdutoSortOption = 'nome_az' | 'nome_za' | 'menor_preco' | 'maior_preco' | 'mais_recentes' | 'mais_antigos' | 'categoria';
 
 interface ProdutoFormModel {
   nome: string;
@@ -23,6 +27,15 @@ interface ProdutoFormModel {
           <h1>Cardápio</h1>
           <p>Cadastre produtos e mantenha o cardápio disponível para as comandas.</p>
         </div>
+
+        <label class="page-search" aria-label="Buscar produto no cardápio">
+          <span aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            placeholder="Buscar produto, descrição ou categoria"
+            [(ngModel)]="search"
+          />
+        </label>
       </section>
 
       @if (errorMessage && !produtoModalOpen) {
@@ -33,11 +46,68 @@ interface ProdutoFormModel {
         <div class="form-feedback success">{{ successMessage }}</div>
       }
 
+      <section class="caixa-filters cardapio-filters" aria-label="Filtros do cardápio">
+        <label>
+          Categoria
+          <select name="cardapioCategoria" [(ngModel)]="categoryFilter">
+            <option value="todos">Todas</option>
+            @for (category of categories; track category) {
+              <option [value]="category">{{ category }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Status
+          <select name="cardapioStatus" [(ngModel)]="statusFilter">
+            <option value="todos">Todos</option>
+            <option value="ativo">Ativos</option>
+            <option value="inativo">Inativos</option>
+          </select>
+        </label>
+
+        <label>
+          Descrição
+          <select name="cardapioDescricao" [(ngModel)]="descriptionFilter">
+            <option value="todos">Todos</option>
+            <option value="com_descricao">Com descrição</option>
+            <option value="sem_descricao">Sem descrição</option>
+          </select>
+        </label>
+
+        <label>
+          Ordenar
+          <select name="cardapioOrdenacao" [(ngModel)]="sortOption">
+            <option value="nome_az">Nome A-Z</option>
+            <option value="nome_za">Nome Z-A</option>
+            <option value="menor_preco">Menor preço</option>
+            <option value="maior_preco">Maior preço</option>
+            <option value="mais_recentes">Mais recentes</option>
+            <option value="mais_antigos">Mais antigos</option>
+            <option value="categoria">Categoria</option>
+          </select>
+        </label>
+
+        <label>
+          Preço mínimo
+          <input type="number" min="0" step="0.01" placeholder="R$ 0,00" [(ngModel)]="minPriceFilter" />
+        </label>
+
+        <label>
+          Preço máximo
+          <input type="number" min="0" step="0.01" placeholder="Sem limite" [(ngModel)]="maxPriceFilter" />
+        </label>
+
+        <button class="clear-filters-button" type="button" (click)="clearFilters()">
+          Limpar filtros
+        </button>
+      </section>
+
       <section class="management-list-card full-management-list">
         <div class="list-card-head">
           <div>
             <h2>Produtos cadastrados</h2>
-            <span>{{ produtos.length }} produtos no cardápio</span>
+            <span>{{ filteredProdutos.length }} exibidos · {{ produtos.length }} produtos no cardápio</span>
           </div>
         </div>
 
@@ -50,7 +120,7 @@ interface ProdutoFormModel {
             <span>Ações</span>
           </div>
 
-          @for (produto of produtos; track produto.id) {
+          @for (produto of filteredProdutos; track produto.id) {
             <div class="management-table-row">
               <div>
                 <strong>{{ produto.nome }}</strong>
@@ -61,10 +131,31 @@ interface ProdutoFormModel {
               <span class="status-chip" [class.inativa]="!produto.ativo">
                 {{ produto.ativo ? 'Ativo' : 'Inativo' }}
               </span>
-              <div class="row-actions">
+              <div class="row-actions client-more-actions product-more-actions" (click)="$event.stopPropagation()">
                 @if (canWriteCardapio) {
-                  <button type="button" (click)="editProduto(produto)">Editar</button>
-                  <button class="danger" type="button" (click)="deleteProduto(produto)">Excluir</button>
+                  <button
+                    class="more-actions-button"
+                    type="button"
+                    [attr.aria-label]="'Abrir ações de ' + produto.nome"
+                    [attr.aria-expanded]="openedActionMenuProdutoId === produto.id"
+                    (click)="toggleProdutoActions(produto.id, $event)"
+                  >
+                    ⋮
+                  </button>
+
+                  @if (openedActionMenuProdutoId === produto.id) {
+                    <div class="row-actions-popup" role="menu">
+                      <button type="button" role="menuitem" (click)="handleEditProduto(produto)">
+                        Editar
+                      </button>
+                      <button type="button" role="menuitem" (click)="handleToggleProduto(produto)">
+                        {{ produto.ativo ? 'Inativar' : 'Ativar' }}
+                      </button>
+                      <button class="danger" type="button" role="menuitem" (click)="handleDeleteProduto(produto)">
+                        Excluir
+                      </button>
+                    </div>
+                  }
                 } @else {
                   <span class="readonly-chip">Somente leitura</span>
                 }
@@ -72,8 +163,8 @@ interface ProdutoFormModel {
             </div>
           } @empty {
             <div class="management-empty-state">
-              <strong>Nenhum produto cadastrado</strong>
-              <span>Clique em Adicionar produto para montar o cardápio.</span>
+              <strong>Nenhum produto encontrado</strong>
+              <span>Ajuste a busca ou limpe os filtros para ver outros produtos.</span>
             </div>
           }
         </div>
@@ -179,11 +270,80 @@ export class CardapioPageComponent {
 
   protected readonly categories = this.produtosService.categories;
   protected produtos = this.produtosService.getProdutos();
+  protected search = '';
+  protected categoryFilter: ProductCategory | 'todos' = 'todos';
+  protected statusFilter: ProdutoStatusFilter = 'todos';
+  protected descriptionFilter: ProdutoDescriptionFilter = 'todos';
+  protected sortOption: ProdutoSortOption = 'nome_az';
+  protected minPriceFilter: number | null = null;
+  protected maxPriceFilter: number | null = null;
+  protected openedActionMenuProdutoId: string | null = null;
   protected editingProdutoId: string | null = null;
   protected produtoModalOpen = false;
   protected errorMessage = '';
   protected successMessage = '';
   protected form: ProdutoFormModel = this.createEmptyForm();
+
+  @HostListener('document:click')
+  protected closeActionMenus(): void {
+    this.openedActionMenuProdutoId = null;
+  }
+
+  protected get filteredProdutos(): Produto[] {
+    const normalizedSearch = this.normalizeText(this.search);
+    const minPrice = this.minPriceFilter ?? null;
+    const maxPrice = this.maxPriceFilter ?? null;
+
+    const filtered = this.produtos.filter((produto) => {
+      if (this.categoryFilter !== 'todos' && produto.categoria !== this.categoryFilter) {
+        return false;
+      }
+
+      if (this.statusFilter === 'ativo' && !produto.ativo) {
+        return false;
+      }
+
+      if (this.statusFilter === 'inativo' && produto.ativo) {
+        return false;
+      }
+
+      const hasDescricao = Boolean(produto.descricao?.trim());
+      if (this.descriptionFilter === 'com_descricao' && !hasDescricao) {
+        return false;
+      }
+
+      if (this.descriptionFilter === 'sem_descricao' && hasDescricao) {
+        return false;
+      }
+
+      if (minPrice !== null && produto.preco < minPrice) {
+        return false;
+      }
+
+      if (maxPrice !== null && produto.preco > maxPrice) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const searchBase = this.normalizeText([produto.nome, produto.descricao, produto.categoria].join(' '));
+      return searchBase.includes(normalizedSearch);
+    });
+
+    return this.sortProdutos(filtered);
+  }
+
+  protected clearFilters(): void {
+    this.search = '';
+    this.categoryFilter = 'todos';
+    this.statusFilter = 'todos';
+    this.descriptionFilter = 'todos';
+    this.sortOption = 'nome_az';
+    this.minPriceFilter = null;
+    this.maxPriceFilter = null;
+  }
 
   protected openCreateModal(): void {
     if (!this.canWriteCardapio) {
@@ -191,6 +351,7 @@ export class CardapioPageComponent {
       return;
     }
 
+    this.openedActionMenuProdutoId = null;
     this.editingProdutoId = null;
     this.form = this.createEmptyForm();
     this.errorMessage = '';
@@ -199,8 +360,29 @@ export class CardapioPageComponent {
   }
 
   protected closeModal(): void {
+    this.openedActionMenuProdutoId = null;
     this.produtoModalOpen = false;
     this.resetForm();
+  }
+
+  protected toggleProdutoActions(produtoId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.openedActionMenuProdutoId = this.openedActionMenuProdutoId === produtoId ? null : produtoId;
+  }
+
+  protected handleEditProduto(produto: Produto): void {
+    this.openedActionMenuProdutoId = null;
+    this.editProduto(produto);
+  }
+
+  protected handleToggleProduto(produto: Produto): void {
+    this.openedActionMenuProdutoId = null;
+    this.toggleProdutoStatus(produto);
+  }
+
+  protected handleDeleteProduto(produto: Produto): void {
+    this.openedActionMenuProdutoId = null;
+    this.deleteProduto(produto);
   }
 
   protected saveProduto(): void {
@@ -262,6 +444,23 @@ export class CardapioPageComponent {
     this.produtoModalOpen = true;
   }
 
+  protected toggleProdutoStatus(produto: Produto): void {
+    if (!this.canWriteCardapio) {
+      this.errorMessage = 'Você não tem permissão para alterar produtos.';
+      return;
+    }
+
+    this.produtosService.updateProduto(produto.id, {
+      nome: produto.nome,
+      descricao: produto.descricao,
+      categoria: produto.categoria,
+      preco: produto.preco,
+      ativo: !produto.ativo,
+    });
+    this.refreshProdutos();
+    this.successMessage = produto.ativo ? 'Produto inativado com sucesso.' : 'Produto ativado com sucesso.';
+  }
+
   protected deleteProduto(produto: Produto): void {
     if (!this.canWriteCardapio) {
       this.errorMessage = 'Você não tem permissão para excluir produtos.';
@@ -308,5 +507,37 @@ export class CardapioPageComponent {
       preco: null,
       ativo: true,
     };
+  }
+
+  private sortProdutos(produtos: Produto[]): Produto[] {
+    const sorted = [...produtos];
+
+    switch (this.sortOption) {
+      case 'nome_za':
+        return sorted.sort((a, b) => b.nome.localeCompare(a.nome, 'pt-BR'));
+      case 'menor_preco':
+        return sorted.sort((a, b) => a.preco - b.preco);
+      case 'maior_preco':
+        return sorted.sort((a, b) => b.preco - a.preco);
+      case 'mais_recentes':
+        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case 'mais_antigos':
+        return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      case 'categoria':
+        return sorted.sort((a, b) =>
+          a.categoria.localeCompare(b.categoria, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'),
+        );
+      case 'nome_az':
+      default:
+        return sorted.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    }
+  }
+
+  private normalizeText(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
   }
 }

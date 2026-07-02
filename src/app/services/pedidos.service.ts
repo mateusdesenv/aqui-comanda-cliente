@@ -6,11 +6,13 @@ export interface PedidoPayload {
   clienteId?: string;
   clienteNome: string;
   telefone?: string;
+  cepEntrega?: string;
   enderecoEntrega: string;
   numero?: string;
   complemento?: string;
   bairro?: string;
   cidade?: string;
+  estado?: string;
   observacoesEntrega?: string;
   itens: ItemPedido[];
   formaPagamento?: PedidoPaymentMethod;
@@ -55,11 +57,13 @@ export class PedidosService {
       clienteId: payload.clienteId || undefined,
       clienteNome: payload.clienteNome,
       telefone: payload.telefone || undefined,
+      cepEntrega: payload.cepEntrega || undefined,
       enderecoEntrega: payload.enderecoEntrega,
       numero: payload.numero || undefined,
       complemento: payload.complemento || undefined,
       bairro: payload.bairro || undefined,
       cidade: payload.cidade || undefined,
+      estado: payload.estado || undefined,
       observacoesEntrega: payload.observacoesEntrega || undefined,
       itens,
       total: this.getItemsTotal(itens),
@@ -97,11 +101,13 @@ export class PedidosService {
       clienteId: payload.clienteId || undefined,
       clienteNome: payload.clienteNome,
       telefone: payload.telefone || undefined,
+      cepEntrega: payload.cepEntrega || undefined,
       enderecoEntrega: payload.enderecoEntrega,
       numero: payload.numero || undefined,
       complemento: payload.complemento || undefined,
       bairro: payload.bairro || undefined,
       cidade: payload.cidade || undefined,
+      estado: payload.estado || undefined,
       observacoesEntrega: payload.observacoesEntrega || undefined,
       itens,
       total: this.getItemsTotal(itens),
@@ -186,7 +192,9 @@ export class PedidosService {
         ...pedido,
         codigo: pedido.codigo || `PED-${String(index + 1).padStart(4, '0')}`,
         clienteNome: pedido.clienteNome || 'Cliente não informado',
+        cepEntrega: pedido.cepEntrega || undefined,
         enderecoEntrega: pedido.enderecoEntrega || '',
+        estado: pedido.estado || undefined,
         itens,
         total: this.getItemsTotal(itens),
         pagamentoConfirmado: pedido.pagamentoConfirmado ?? false,

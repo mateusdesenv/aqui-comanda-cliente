@@ -7,6 +7,7 @@ export interface ClientePayload {
   cpf: string;
   dataNascimento: string;
   endereco?: string;
+  cep?: string;
 }
 
 @Injectable({ providedIn: 'root' })

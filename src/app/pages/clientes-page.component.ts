@@ -2,12 +2,14 @@ import { Component, HostListener, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { Cliente } from '../models/app-data';
+import { CepService } from '../services/cep.service';
 import { ClientePayload, ClientesService } from '../services/clientes.service';
 
 interface ClienteFormModel {
   nome: string;
   cpf: string;
   dataNascimento: string;
+  cep: string;
   endereco: string;
 }
 
@@ -152,6 +154,23 @@ interface ClienteFormModel {
               </label>
 
               <label>
+                CEP <span class="optional-label">opcional</span>
+                <input
+                  type="text"
+                  name="cep"
+                  inputmode="numeric"
+                  maxlength="9"
+                  placeholder="00000-000"
+                  [ngModel]="form.cep"
+                  (ngModelChange)="onClienteCepChange($event)"
+                />
+              </label>
+
+              @if (cepFeedback) {
+                <div class="cep-inline-feedback" [class.error]="cepFeedbackType === 'error'">{{ cepFeedback }}</div>
+              }
+
+              <label>
                 Endereço
                 <textarea
                   name="endereco"
@@ -181,6 +200,7 @@ interface ClienteFormModel {
 export class ClientesPageComponent {
   private readonly clientesService = inject(ClientesService);
   private readonly authService = inject(AuthService);
+  private readonly cepService = inject(CepService);
 
   protected get canWriteClientes(): boolean {
     return this.authService.canWrite('clientes');
@@ -192,6 +212,8 @@ export class ClientesPageComponent {
   protected errorMessage = '';
   protected successMessage = '';
   protected openedActionMenuClienteId: string | null = null;
+  protected cepFeedback = '';
+  protected cepFeedbackType: 'success' | 'error' | 'loading' = 'success';
   protected form: ClienteFormModel = this.createEmptyForm();
 
   @HostListener('document:click')
@@ -273,6 +295,7 @@ export class ClientesPageComponent {
       cpf: this.form.cpf,
       dataNascimento: this.form.dataNascimento,
       endereco: this.form.endereco.trim() || undefined,
+      cep: this.cepService.formatCep(this.form.cep).trim() || undefined,
     };
 
     if (this.editingClienteId) {
@@ -301,8 +324,10 @@ export class ClientesPageComponent {
       nome: cliente.nome,
       cpf: cliente.cpf,
       dataNascimento: cliente.dataNascimento,
+      cep: this.cepService.formatCep(cliente.cep ?? ''),
       endereco: cliente.endereco ?? '',
     };
+    this.cepFeedback = '';
     this.clienteModalOpen = true;
   }
 
@@ -325,10 +350,34 @@ export class ClientesPageComponent {
     this.editingClienteId = null;
     this.errorMessage = '';
     this.form = this.createEmptyForm();
+    this.cepFeedback = '';
   }
 
   protected onCpfChange(value: string): void {
     this.form.cpf = this.formatCpf(value);
+  }
+
+  protected async onClienteCepChange(value: string): Promise<void> {
+    this.form.cep = this.cepService.formatCep(value);
+    this.cepFeedback = '';
+
+    if (!this.cepService.isCepComplete(this.form.cep)) {
+      return;
+    }
+
+    this.cepFeedbackType = 'loading';
+    this.cepFeedback = 'Buscando endereço...';
+
+    try {
+      const endereco = await this.cepService.buscarCep(this.form.cep);
+      this.form.cep = endereco.cep;
+      this.form.endereco = this.formatEnderecoFromCep(endereco);
+      this.cepFeedbackType = 'success';
+      this.cepFeedback = 'Endereço preenchido pelo CEP. Você pode editar os dados se precisar.';
+    } catch (error) {
+      this.cepFeedbackType = 'error';
+      this.cepFeedback = error instanceof Error ? error.message : 'Não foi possível buscar o endereço agora.';
+    }
   }
 
   protected formatDate(value: string): string {
@@ -348,6 +397,7 @@ export class ClientesPageComponent {
     this.editingClienteId = null;
     this.errorMessage = '';
     this.form = this.createEmptyForm();
+    this.cepFeedback = '';
   }
 
   private createEmptyForm(): ClienteFormModel {
@@ -355,6 +405,7 @@ export class ClientesPageComponent {
       nome: '',
       cpf: '',
       dataNascimento: '',
+      cep: '',
       endereco: '',
     };
   }
@@ -375,6 +426,18 @@ export class ClientesPageComponent {
     }
 
     return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+
+  private formatEnderecoFromCep(endereco: { rua: string; bairro: string; cidade: string; estado: string; complemento?: string }): string {
+    return [
+      endereco.rua,
+      endereco.complemento,
+      endereco.bairro,
+      endereco.cidade,
+      endereco.estado,
+    ]
+      .filter(Boolean)
+      .join(', ');
   }
 
   private isCpfComplete(value: string): boolean {

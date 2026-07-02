@@ -9,6 +9,7 @@ export type PedidoStatus = 'aberto' | 'em_preparo' | 'saiu_entrega' | 'entregue'
 export type PedidoPaymentMethod = 'dinheiro' | 'pix' | 'credito' | 'debito' | 'outro';
 export type TipoEntradaCaixa = 'comanda';
 export type CaixaDateFilter = 'todas' | 'hoje' | 'ultimos_7' | 'ultimos_30';
+export type StatusCaixa = 'aberto' | 'fechado';
 
 export type NivelAcesso = 'admin' | 'colaborador';
 
@@ -34,6 +35,37 @@ export interface TelaPermissaoConfig {
   tela: TelaSistema;
   label: string;
   path: string;
+}
+
+
+export interface EnderecoCep {
+  cep: string;
+  rua: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  complemento?: string;
+}
+
+export interface EnderecoFilial {
+  rua: string;
+  numero: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  cep?: string;
+}
+
+export interface Filial {
+  id: string;
+  nome: string;
+  descricao?: string;
+  endereco: EnderecoFilial;
+  colaboradoresIds: string[];
+  ativa: boolean;
+  criadaEm: string;
+  atualizadaEm?: string;
 }
 
 export interface Colaborador {
@@ -63,11 +95,13 @@ export interface Pedido {
   clienteId?: string;
   clienteNome: string;
   telefone?: string;
+  cepEntrega?: string;
   enderecoEntrega: string;
   numero?: string;
   complemento?: string;
   bairro?: string;
   cidade?: string;
+  estado?: string;
   observacoesEntrega?: string;
   itens: ItemPedido[];
   total: number;
@@ -92,8 +126,24 @@ export interface EntradaCaixa {
   mesaNumero?: number | string | null;
   valor: number;
   formaPagamento?: string;
+  sessaoCaixaId?: string;
   criadaEm: string;
   comandaFinalizadaEm?: string;
+}
+
+export interface SessaoCaixa {
+  id: string;
+  status: StatusCaixa;
+  abertoEm: string;
+  fechadoEm?: string;
+  abertoPorId?: string;
+  abertoPorNome?: string;
+  fechadoPorId?: string;
+  fechadoPorNome?: string;
+  observacaoAbertura?: string;
+  observacaoFechamento?: string;
+  totalEntradas: number;
+  quantidadeEntradas: number;
 }
 
 export interface Comanda {
@@ -147,6 +197,7 @@ export interface Cliente {
   cpf: string;
   dataNascimento: string;
   endereco?: string;
+  cep?: string;
   createdAt: string;
   updatedAt: string;
 }

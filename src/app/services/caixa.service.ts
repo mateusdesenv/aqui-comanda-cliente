@@ -1,22 +1,95 @@
-import { Injectable, signal } from '@angular/core';
-import { Comanda, EntradaCaixa, Mesa } from '../models/app-data';
+import { Injectable, inject, signal } from '@angular/core';
+import { Colaborador, Comanda, EntradaCaixa, Mesa, SessaoCaixa } from '../models/app-data';
 import { LocalStorageRepository } from './local-storage.repository';
 
 @Injectable({ providedIn: 'root' })
 export class CaixaService {
-  private readonly repository = new LocalStorageRepository<EntradaCaixa[]>(
+  private readonly entradasRepository = new LocalStorageRepository<EntradaCaixa[]>(
     'aqui-comanda:caixa-entradas',
     [],
   );
 
-  readonly entradas = signal<EntradaCaixa[]>(this.normalizeEntradas(this.repository.read()));
+  private readonly sessoesRepository = new LocalStorageRepository<SessaoCaixa[]>(
+    'aqui-comanda:caixa-sessoes',
+    [],
+  );
+
+  readonly entradas = signal<EntradaCaixa[]>(this.normalizeEntradas(this.entradasRepository.read()));
+  readonly sessoes = signal<SessaoCaixa[]>(this.normalizeSessoes(this.sessoesRepository.read()));
 
   constructor() {
-    this.persist();
+    this.persistEntradas();
+    this.persistSessoes();
   }
 
   getEntradas(): EntradaCaixa[] {
     return this.entradas();
+  }
+
+  getSessoes(): SessaoCaixa[] {
+    return this.sessoes();
+  }
+
+  getSessaoAberta(): SessaoCaixa | null {
+    return this.sessoes().find((sessao) => sessao.status === 'aberto') ?? null;
+  }
+
+  hasCaixaAberto(): boolean {
+    return Boolean(this.getSessaoAberta());
+  }
+
+  abrirCaixa(observacaoAbertura = '', usuario?: Colaborador | null): SessaoCaixa | null {
+    if (this.hasCaixaAberto()) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const sessao: SessaoCaixa = {
+      id: `caixa-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      status: 'aberto',
+      abertoEm: now,
+      abertoPorId: usuario?.id,
+      abertoPorNome: usuario?.nome,
+      observacaoAbertura: observacaoAbertura.trim() || undefined,
+      totalEntradas: 0,
+      quantidadeEntradas: 0,
+    };
+
+    this.sessoes.set([sessao, ...this.sessoes()]);
+    this.persistSessoes();
+    return sessao;
+  }
+
+  fecharCaixa(observacaoFechamento = '', usuario?: Colaborador | null): SessaoCaixa | null {
+    const sessaoAberta = this.getSessaoAberta();
+
+    if (!sessaoAberta) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const entradasDaSessao = this.getEntradasBySessao(sessaoAberta.id);
+    const totalEntradas = this.getTotalRecebido(entradasDaSessao);
+    const sessaoFechada: SessaoCaixa = {
+      ...sessaoAberta,
+      status: 'fechado',
+      fechadoEm: now,
+      fechadoPorId: usuario?.id,
+      fechadoPorNome: usuario?.nome,
+      observacaoFechamento: observacaoFechamento.trim() || undefined,
+      totalEntradas,
+      quantidadeEntradas: entradasDaSessao.length,
+    };
+
+    this.sessoes.set(
+      this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? sessaoFechada : sessao)),
+    );
+    this.persistSessoes();
+    return sessaoFechada;
+  }
+
+  getEntradasBySessao(sessaoId: string): EntradaCaixa[] {
+    return this.entradas().filter((entrada) => entrada.sessaoCaixaId === sessaoId);
   }
 
   getTotalRecebido(entradas: EntradaCaixa[] = this.entradas()): number {
@@ -28,11 +101,33 @@ export class CaixaService {
     return entradas.filter((entrada) => this.getDateKey(new Date(entrada.criadaEm)) === todayKey);
   }
 
+  getEntradasPorFormaPagamento(entradas: EntradaCaixa[] = this.entradas()): Array<{ forma: string; total: number; quantidade: number }> {
+    const grouped = new Map<string, { forma: string; total: number; quantidade: number }>();
+
+    entradas.forEach((entrada) => {
+      const forma = entrada.formaPagamento || 'Não informado';
+      const current = grouped.get(forma) ?? { forma, total: 0, quantidade: 0 };
+      grouped.set(forma, {
+        forma,
+        total: current.total + entrada.valor,
+        quantidade: current.quantidade + 1,
+      });
+    });
+
+    return [...grouped.values()].sort((a, b) => b.total - a.total);
+  }
+
   hasEntradaForComanda(comandaId: string): boolean {
     return this.entradas().some((entrada) => entrada.tipo === 'comanda' && entrada.origemId === comandaId);
   }
 
   registrarEntradaComanda(comanda: Comanda, mesa?: Mesa | null): EntradaCaixa | null {
+    const sessaoAberta = this.getSessaoAberta();
+
+    if (!sessaoAberta) {
+      return null;
+    }
+
     if (!this.isComandaPaga(comanda)) {
       return null;
     }
@@ -64,17 +159,43 @@ export class CaixaService {
       mesaNumero: mesa?.numero ?? null,
       valor,
       formaPagamento: 'Não informado',
+      sessaoCaixaId: sessaoAberta.id,
       criadaEm: now,
       comandaFinalizadaEm: comanda.finalizadaEm ?? now,
     };
 
     this.entradas.set(this.sortEntradas([entrada, ...this.entradas()]));
-    this.persist();
+    this.persistEntradas();
+    this.recalcularSessaoAberta();
     return entrada;
   }
 
-  private persist(): void {
-    this.repository.write(this.entradas());
+  private recalcularSessaoAberta(): void {
+    const sessaoAberta = this.getSessaoAberta();
+
+    if (!sessaoAberta) {
+      return;
+    }
+
+    const entradasDaSessao = this.getEntradasBySessao(sessaoAberta.id);
+    const updatedSessao: SessaoCaixa = {
+      ...sessaoAberta,
+      totalEntradas: this.getTotalRecebido(entradasDaSessao),
+      quantidadeEntradas: entradasDaSessao.length,
+    };
+
+    this.sessoes.set(
+      this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? updatedSessao : sessao)),
+    );
+    this.persistSessoes();
+  }
+
+  private persistEntradas(): void {
+    this.entradasRepository.write(this.entradas());
+  }
+
+  private persistSessoes(): void {
+    this.sessoesRepository.write(this.sessoes());
   }
 
   private normalizeEntradas(entradas: EntradaCaixa[]): EntradaCaixa[] {
@@ -91,9 +212,49 @@ export class CaixaService {
           mesaNumero: entrada.mesaNumero ?? null,
           valor: Number(entrada.valor) || 0,
           formaPagamento: entrada.formaPagamento ?? 'Não informado',
+          sessaoCaixaId: entrada.sessaoCaixaId,
           criadaEm: entrada.criadaEm ?? entrada.comandaFinalizadaEm ?? new Date().toISOString(),
         })),
     );
+  }
+
+  private normalizeSessoes(sessoes: SessaoCaixa[]): SessaoCaixa[] {
+    const normalized = sessoes
+      .filter((sessao) => sessao.id && sessao.abertoEm)
+      .map((sessao) => {
+        const entradasDaSessao = this.entradas().filter((entrada) => entrada.sessaoCaixaId === sessao.id);
+        const isAberto = sessao.status === 'aberto';
+
+        return {
+          ...sessao,
+          status: isAberto ? 'aberto' : 'fechado',
+          totalEntradas: isAberto
+            ? this.getTotalRecebido(entradasDaSessao)
+            : Number(sessao.totalEntradas) || this.getTotalRecebido(entradasDaSessao),
+          quantidadeEntradas: isAberto
+            ? entradasDaSessao.length
+            : Number(sessao.quantidadeEntradas) || entradasDaSessao.length,
+        } as SessaoCaixa;
+      })
+      .sort((a, b) => new Date(b.abertoEm).getTime() - new Date(a.abertoEm).getTime());
+
+    let foundOpen = false;
+    return normalized.map((sessao) => {
+      if (sessao.status !== 'aberto') {
+        return sessao;
+      }
+
+      if (!foundOpen) {
+        foundOpen = true;
+        return sessao;
+      }
+
+      return {
+        ...sessao,
+        status: 'fechado',
+        fechadoEm: sessao.fechadoEm ?? new Date().toISOString(),
+      };
+    });
   }
 
   private sortEntradas(entradas: EntradaCaixa[]): EntradaCaixa[] {

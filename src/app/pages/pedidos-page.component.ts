@@ -12,6 +12,7 @@ import {
   ProductCategory,
   Produto,
 } from '../models/app-data';
+import { CepService } from '../services/cep.service';
 import { ClientesService } from '../services/clientes.service';
 import { AuthService } from '../services/auth.service';
 import { PedidoPayload, PedidosService } from '../services/pedidos.service';
@@ -23,11 +24,13 @@ interface PedidoFormModel {
   clienteId: string;
   clienteNome: string;
   telefone: string;
+  cepEntrega: string;
   enderecoEntrega: string;
   numero: string;
   complemento: string;
   bairro: string;
   cidade: string;
+  estado: string;
   observacoesEntrega: string;
   formaPagamento: '' | PedidoPaymentMethod;
   trocoPara: number | null;
@@ -260,6 +263,23 @@ interface PedidoFormModel {
                     />
                   </label>
 
+                  <label>
+                    CEP <span class="optional-label">opcional</span>
+                    <input
+                      type="text"
+                      name="cepEntrega"
+                      maxlength="9"
+                      inputmode="numeric"
+                      placeholder="00000-000"
+                      [ngModel]="form.cepEntrega"
+                      (ngModelChange)="onPedidoCepChange($event)"
+                    />
+                  </label>
+
+                  @if (cepFeedback) {
+                    <div class="cep-inline-feedback span-2" [class.error]="cepFeedbackType === 'error'">{{ cepFeedback }}</div>
+                  }
+
                   <label class="span-2">
                     Endereço de entrega
                     <input
@@ -285,6 +305,11 @@ interface PedidoFormModel {
                   <label>
                     Cidade <span class="optional-label">opcional</span>
                     <input type="text" name="cidade" placeholder="Ex.: Criciúma" [(ngModel)]="form.cidade" />
+                  </label>
+
+                  <label>
+                    Estado <span class="optional-label">opcional</span>
+                    <input type="text" name="estado" maxlength="2" placeholder="SC" [ngModel]="form.estado" (ngModelChange)="form.estado = $event.toUpperCase()" />
                   </label>
 
                   <label>
@@ -613,11 +638,14 @@ export class PedidosPageComponent {
   private readonly pedidosService = inject(PedidosService);
   private readonly clientesService = inject(ClientesService);
   private readonly produtosService = inject(ProdutosService);
+  private readonly cepService = inject(CepService);
   private readonly authService = inject(AuthService);
 
   protected search = '';
   protected feedbackMessage = '';
   protected errorMessage = '';
+  protected cepFeedback = '';
+  protected cepFeedbackType: 'success' | 'error' | 'loading' = 'success';
   protected pedidoModalOpen = false;
   protected editingPedido: Pedido | null = null;
   protected detailsPedido: Pedido | null = null;
@@ -687,10 +715,13 @@ export class PedidosPageComponent {
         pedido.codigo,
         pedido.clienteNome,
         pedido.telefone,
+        pedido.cepEntrega,
         pedido.enderecoEntrega,
         pedido.numero,
+        pedido.complemento,
         pedido.bairro,
         pedido.cidade,
+        pedido.estado,
         this.getStatusLabel(pedido.status),
       ]
         .filter(Boolean)
@@ -728,6 +759,7 @@ export class PedidosPageComponent {
 
     this.feedbackMessage = '';
     this.errorMessage = '';
+    this.cepFeedback = '';
     this.editingPedido = null;
     this.detailsPedido = null;
     this.form = this.createEmptyForm();
@@ -750,17 +782,20 @@ export class PedidosPageComponent {
 
     this.feedbackMessage = '';
     this.errorMessage = '';
+    this.cepFeedback = '';
     this.detailsPedido = null;
     this.editingPedido = pedido;
     this.form = {
       clienteId: pedido.clienteId ?? '',
       clienteNome: pedido.clienteNome,
       telefone: pedido.telefone ?? '',
+      cepEntrega: this.cepService.formatCep(pedido.cepEntrega ?? ''),
       enderecoEntrega: pedido.enderecoEntrega,
       numero: pedido.numero ?? '',
       complemento: pedido.complemento ?? '',
       bairro: pedido.bairro ?? '',
       cidade: pedido.cidade ?? '',
+      estado: pedido.estado ?? '',
       observacoesEntrega: pedido.observacoesEntrega ?? '',
       formaPagamento: pedido.formaPagamento ?? '',
       trocoPara: pedido.trocoPara ?? null,
@@ -779,6 +814,7 @@ export class PedidosPageComponent {
     this.pedidoModalOpen = false;
     this.editingPedido = null;
     this.errorMessage = '';
+    this.cepFeedback = '';
   }
 
   protected savePedido(): void {
@@ -819,11 +855,13 @@ export class PedidosPageComponent {
       clienteId: selectedCliente.id,
       clienteNome: selectedCliente.nome,
       telefone: this.form.telefone.trim() || undefined,
+      cepEntrega: this.cepService.formatCep(this.form.cepEntrega).trim() || undefined,
       enderecoEntrega: this.form.enderecoEntrega.trim(),
       numero: this.form.numero.trim() || undefined,
       complemento: this.form.complemento.trim() || undefined,
       bairro: this.form.bairro.trim() || undefined,
       cidade: this.form.cidade.trim() || undefined,
+      estado: this.form.estado.trim().toUpperCase() || undefined,
       observacoesEntrega: this.form.observacoesEntrega.trim() || undefined,
       itens: this.items,
       formaPagamento: this.form.formaPagamento || undefined,
@@ -865,6 +903,37 @@ export class PedidosPageComponent {
     this.form.telefone = this.formatPhone(value);
   }
 
+  protected async onPedidoCepChange(value: string): Promise<void> {
+    this.form.cepEntrega = this.cepService.formatCep(value);
+    this.cepFeedback = '';
+
+    if (!this.cepService.isCepComplete(this.form.cepEntrega)) {
+      return;
+    }
+
+    this.cepFeedbackType = 'loading';
+    this.cepFeedback = 'Buscando endereço...';
+
+    try {
+      const endereco = await this.cepService.buscarCep(this.form.cepEntrega);
+      this.form.cepEntrega = endereco.cep;
+      this.form.enderecoEntrega = endereco.rua || this.form.enderecoEntrega;
+      this.form.bairro = endereco.bairro || this.form.bairro;
+      this.form.cidade = endereco.cidade || this.form.cidade;
+      this.form.estado = endereco.estado || this.form.estado;
+
+      if (endereco.complemento && !this.form.complemento.trim()) {
+        this.form.complemento = endereco.complemento;
+      }
+
+      this.cepFeedbackType = 'success';
+      this.cepFeedback = 'Endereço preenchido pelo CEP. Você pode editar os dados se precisar.';
+    } catch (error) {
+      this.cepFeedbackType = 'error';
+      this.cepFeedback = error instanceof Error ? error.message : 'Não foi possível buscar o endereço agora.';
+    }
+  }
+
   protected onClienteChange(clienteId: string): void {
     this.errorMessage = '';
     const cliente = this.clientes.find((currentCliente) => currentCliente.id === clienteId);
@@ -878,6 +947,10 @@ export class PedidosPageComponent {
 
     if (!this.form.enderecoEntrega.trim() && cliente.endereco) {
       this.form.enderecoEntrega = cliente.endereco;
+    }
+
+    if (!this.form.cepEntrega.trim() && cliente.cep) {
+      this.form.cepEntrega = cliente.cep;
     }
   }
 
@@ -1074,11 +1147,13 @@ export class PedidosPageComponent {
 
   protected formatAddress(pedido: Pedido): string {
     return [
+      pedido.cepEntrega ? `CEP ${pedido.cepEntrega}` : '',
       pedido.enderecoEntrega,
       pedido.numero,
       pedido.complemento,
       pedido.bairro,
       pedido.cidade,
+      pedido.estado,
     ]
       .filter(Boolean)
       .join(', ');
@@ -1141,11 +1216,13 @@ export class PedidosPageComponent {
       clienteId: '',
       clienteNome: '',
       telefone: '',
+      cepEntrega: '',
       enderecoEntrega: '',
       numero: '',
       complemento: '',
       bairro: '',
       cidade: '',
+      estado: '',
       observacoesEntrega: '',
       formaPagamento: '',
       trocoPara: null,
