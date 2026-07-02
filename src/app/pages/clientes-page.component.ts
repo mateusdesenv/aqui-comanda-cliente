@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth.service';
 import { Cliente } from '../models/app-data';
 import { ClientePayload, ClientesService } from '../services/clientes.service';
 
@@ -86,7 +87,7 @@ interface ClienteFormModel {
           }
 
           <div class="form-actions">
-            <button class="primary-action-button" type="submit">
+            <button class="primary-action-button" type="submit" [disabled]="!canWriteClientes">
               {{ editingClienteId ? 'Salvar alterações' : 'Cadastrar cliente' }}
             </button>
             <button class="ghost-button" type="button" (click)="resetForm()">Cancelar</button>
@@ -117,8 +118,12 @@ interface ClienteFormModel {
                 <span>{{ formatDate(cliente.dataNascimento) }}</span>
                 <span>{{ cliente.endereco || '-' }}</span>
                 <div class="row-actions">
-                  <button type="button" (click)="editCliente(cliente)">Editar</button>
-                  <button class="danger" type="button" (click)="deleteCliente(cliente)">Excluir</button>
+                  @if (canWriteClientes) {
+                    <button type="button" (click)="editCliente(cliente)">Editar</button>
+                    <button class="danger" type="button" (click)="deleteCliente(cliente)">Excluir</button>
+                  } @else {
+                    <span class="readonly-chip">Somente leitura</span>
+                  }
                 </div>
               </div>
             } @empty {
@@ -135,6 +140,11 @@ interface ClienteFormModel {
 })
 export class ClientesPageComponent {
   private readonly clientesService = inject(ClientesService);
+  private readonly authService = inject(AuthService);
+
+  protected get canWriteClientes(): boolean {
+    return this.authService.canWrite('clientes');
+  }
 
   protected clientes = this.clientesService.getClientes();
   protected editingClienteId: string | null = null;
@@ -143,6 +153,11 @@ export class ClientesPageComponent {
   protected form: ClienteFormModel = this.createEmptyForm();
 
   protected saveCliente(): void {
+    if (!this.canWriteClientes) {
+      this.errorMessage = 'Você não tem permissão de escrita em Clientes.';
+      return;
+    }
+
     this.errorMessage = '';
     this.successMessage = '';
 
@@ -190,6 +205,11 @@ export class ClientesPageComponent {
   }
 
   protected editCliente(cliente: Cliente): void {
+    if (!this.canWriteClientes) {
+      this.errorMessage = 'Você não tem permissão para editar clientes.';
+      return;
+    }
+
     this.errorMessage = '';
     this.successMessage = '';
     this.editingClienteId = cliente.id;
@@ -202,6 +222,11 @@ export class ClientesPageComponent {
   }
 
   protected deleteCliente(cliente: Cliente): void {
+    if (!this.canWriteClientes) {
+      this.errorMessage = 'Você não tem permissão para excluir clientes.';
+      return;
+    }
+
     if (this.editingClienteId === cliente.id) {
       this.resetForm();
     }

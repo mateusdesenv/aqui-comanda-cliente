@@ -9,6 +9,7 @@ import { StatCardComponent } from '../components/stat-card.component';
 import { Comanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
 import { ComandasService } from '../services/comandas.service';
 import { MesasService } from '../services/mesas.service';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-mapa-comandas-page',
@@ -90,8 +91,12 @@ import { MesasService } from '../services/mesas.service';
                 </div>
                 <span>{{ formatCurrency(comanda.total) }}</span>
                 <div class="quick-comanda-actions">
-                  <button class="quick-comanda-edit-button" type="button" (click)="editQuickComanda(comanda)">Editar</button>
-                  <button class="quick-comanda-close-button" type="button" (click)="closeQuickComanda(comanda)">Fechar</button>
+                  @if (canWriteMapa) {
+                    <button class="quick-comanda-edit-button" type="button" (click)="editQuickComanda(comanda)">Editar</button>
+                    <button class="quick-comanda-close-button" type="button" (click)="closeQuickComanda(comanda)">Fechar</button>
+                  } @else {
+                    <span class="readonly-chip">Somente leitura</span>
+                  }
                 </div>
               </article>
             }
@@ -99,19 +104,22 @@ import { MesasService } from '../services/mesas.service';
         </section>
       }
 
-      <button
-        class="floating-comanda-button"
-        type="button"
-        aria-label="Criar nova comanda"
-        (click)="openQuickComandaModal()"
-      >
-        <app-icon name="receipt" [size]="22" />
-        <span>Criar nova comanda</span>
-      </button>
+      @if (canWriteMapa) {
+        <button
+          class="floating-comanda-button"
+          type="button"
+          aria-label="Criar nova comanda"
+          (click)="openQuickComandaModal()"
+        >
+          <app-icon name="receipt" [size]="22" />
+          <span>Criar nova comanda</span>
+        </button>
+      }
 
       @if (selectedMesa) {
         <app-comanda-detail-modal
           [mesa]="selectedMesa"
+          [canWrite]="canWriteMapa"
           (close)="closeComandaModal()"
           (createForMesa)="openQuickComandaModalForMesa($event)"
         />
@@ -131,6 +139,11 @@ import { MesasService } from '../services/mesas.service';
 export class MapaComandasPageComponent {
   private readonly comandasService = inject(ComandasService);
   private readonly mesasService = inject(MesasService);
+  private readonly authService = inject(AuthService);
+
+  protected get canWriteMapa(): boolean {
+    return this.authService.canWrite('mapa');
+  }
 
   protected search = '';
   protected feedbackMessage = '';
@@ -196,6 +209,10 @@ export class MapaComandasPageComponent {
   }
 
   protected openQuickComandaModal(): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.feedbackMessage = '';
     this.editingQuickComanda = null;
     this.quickComandaInitialMesaId = '';
@@ -203,6 +220,10 @@ export class MapaComandasPageComponent {
   }
 
   protected openQuickComandaModalForMesa(mesa: Mesa): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.feedbackMessage = '';
     this.editingQuickComanda = null;
     this.quickComandaInitialMesaId = mesa.id;
@@ -210,6 +231,10 @@ export class MapaComandasPageComponent {
   }
 
   protected editQuickComanda(comanda: Comanda): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.feedbackMessage = '';
     this.editingQuickComanda = comanda;
     this.quickComandaInitialMesaId = '';
@@ -237,6 +262,10 @@ export class MapaComandasPageComponent {
   }
 
   protected closeQuickComanda(comanda: Comanda): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.comandasService.closeComandaById(comanda.id);
     this.feedbackMessage = `Comanda de ${comanda.clienteNome ?? 'cliente'} fechada.`;
   }
@@ -257,6 +286,15 @@ export class MapaComandasPageComponent {
 
   protected getOcupadaHelper(): string {
     return `${this.getPercent(this.resumo.ocupadas)}% das mesas ativas`;
+  }
+
+  private ensureCanWrite(): boolean {
+    if (this.canWriteMapa) {
+      return true;
+    }
+
+    this.feedbackMessage = 'Você não tem permissão de escrita no Mapa de Comandas.';
+    return false;
   }
 
   private getPercent(value: number): number {

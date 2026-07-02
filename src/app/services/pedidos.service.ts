@@ -16,10 +16,14 @@ export interface PedidoPayload {
   formaPagamento?: PedidoPaymentMethod;
   trocoPara?: number;
   observacoesPedido?: string;
+  status?: PedidoStatus;
+  justificativaCancelamento?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class PedidosService {
+  private readonly workflowStatusSequence: PedidoStatus[] = ['aberto', 'em_preparo', 'saiu_entrega', 'entregue'];
+
   private readonly repository = new LocalStorageRepository<Pedido[]>(
     'aqui-comanda:pedidos',
     [],
@@ -62,6 +66,7 @@ export class PedidosService {
       formaPagamento: payload.formaPagamento || undefined,
       trocoPara: payload.trocoPara || undefined,
       observacoesPedido: payload.observacoesPedido || undefined,
+      pagamentoConfirmado: false,
       status: 'aberto',
       createdAt: now,
       updatedAt: now,
@@ -76,6 +81,13 @@ export class PedidosService {
     const existingPedido = this.pedidos().find((pedido) => pedido.id === id);
 
     if (!existingPedido) {
+      return null;
+    }
+
+    const nextStatus = payload.status ?? existingPedido.status;
+    const justificativaCancelamento = payload.justificativaCancelamento?.trim();
+
+    if (nextStatus === 'cancelado' && !justificativaCancelamento) {
       return null;
     }
 
@@ -96,6 +108,8 @@ export class PedidosService {
       formaPagamento: payload.formaPagamento || undefined,
       trocoPara: payload.trocoPara || undefined,
       observacoesPedido: payload.observacoesPedido || undefined,
+      status: nextStatus,
+      justificativaCancelamento: nextStatus === 'cancelado' ? justificativaCancelamento : undefined,
       updatedAt: new Date().toISOString(),
     };
 
@@ -108,7 +122,7 @@ export class PedidosService {
     return updatedPedido;
   }
 
-  updateStatus(id: string, status: PedidoStatus): Pedido | null {
+  confirmPayment(id: string): Pedido | null {
     let updatedPedido: Pedido | null = null;
 
     this.pedidos.set(
@@ -120,7 +134,35 @@ export class PedidosService {
 
           updatedPedido = {
             ...pedido,
+            pagamentoConfirmado: true,
+            updatedAt: new Date().toISOString(),
+          };
+          return updatedPedido;
+        }),
+      ),
+    );
+    this.persist();
+    return updatedPedido;
+  }
+
+  updateStatus(id: string, status: PedidoStatus): Pedido | null {
+    if (!this.workflowStatusSequence.includes(status)) {
+      return null;
+    }
+
+    let updatedPedido: Pedido | null = null;
+
+    this.pedidos.set(
+      this.sortByCreatedAt(
+        this.pedidos().map((pedido) => {
+          if (pedido.id !== id || !this.workflowStatusSequence.includes(pedido.status)) {
+            return pedido;
+          }
+
+          updatedPedido = {
+            ...pedido,
             status,
+            justificativaCancelamento: undefined,
             updatedAt: new Date().toISOString(),
           };
           return updatedPedido;
@@ -147,7 +189,9 @@ export class PedidosService {
         enderecoEntrega: pedido.enderecoEntrega || '',
         itens,
         total: this.getItemsTotal(itens),
+        pagamentoConfirmado: pedido.pagamentoConfirmado ?? false,
         status: pedido.status || 'aberto',
+        justificativaCancelamento: pedido.justificativaCancelamento || undefined,
       };
     });
   }

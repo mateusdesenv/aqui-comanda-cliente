@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth.service';
 import { ProductCategory, Produto } from '../models/app-data';
 import { ProdutoPayload, ProdutosService } from '../services/produtos.service';
 
@@ -85,7 +86,7 @@ interface ProdutoFormModel {
             <div class="form-feedback">{{ errorMessage }}</div>
           }
 
-          <button class="primary-action-button" type="submit">
+          <button class="primary-action-button" type="submit" [disabled]="!canWriteCardapio">
             {{ editingProdutoId ? 'Salvar alterações' : 'Cadastrar produto' }}
           </button>
         </form>
@@ -119,8 +120,12 @@ interface ProdutoFormModel {
                   {{ produto.ativo ? 'Ativo' : 'Inativo' }}
                 </span>
                 <div class="row-actions">
-                  <button type="button" (click)="editProduto(produto)">Editar</button>
-                  <button class="danger" type="button" (click)="deleteProduto(produto)">Excluir</button>
+                  @if (canWriteCardapio) {
+                    <button type="button" (click)="editProduto(produto)">Editar</button>
+                    <button class="danger" type="button" (click)="deleteProduto(produto)">Excluir</button>
+                  } @else {
+                    <span class="readonly-chip">Somente leitura</span>
+                  }
                 </div>
               </div>
             } @empty {
@@ -137,6 +142,11 @@ interface ProdutoFormModel {
 })
 export class CardapioPageComponent {
   private readonly produtosService = inject(ProdutosService);
+  private readonly authService = inject(AuthService);
+
+  protected get canWriteCardapio(): boolean {
+    return this.authService.canWrite('cardapio');
+  }
 
   protected readonly categories = this.produtosService.categories;
   protected produtos = this.produtosService.getProdutos();
@@ -145,6 +155,11 @@ export class CardapioPageComponent {
   protected form: ProdutoFormModel = this.createEmptyForm();
 
   protected saveProduto(): void {
+    if (!this.canWriteCardapio) {
+      this.errorMessage = 'Você não tem permissão de escrita em Cardápio.';
+      return;
+    }
+
     this.errorMessage = '';
 
     if (!this.form.nome.trim()) {
@@ -176,6 +191,11 @@ export class CardapioPageComponent {
   }
 
   protected editProduto(produto: Produto): void {
+    if (!this.canWriteCardapio) {
+      this.errorMessage = 'Você não tem permissão para editar produtos.';
+      return;
+    }
+
     this.errorMessage = '';
     this.editingProdutoId = produto.id;
     this.form = {
@@ -188,6 +208,11 @@ export class CardapioPageComponent {
   }
 
   protected deleteProduto(produto: Produto): void {
+    if (!this.canWriteCardapio) {
+      this.errorMessage = 'Você não tem permissão para excluir produtos.';
+      return;
+    }
+
     if (this.editingProdutoId === produto.id) {
       this.resetForm();
     }

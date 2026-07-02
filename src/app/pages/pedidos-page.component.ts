@@ -13,6 +13,7 @@ import {
   Produto,
 } from '../models/app-data';
 import { ClientesService } from '../services/clientes.service';
+import { AuthService } from '../services/auth.service';
 import { PedidoPayload, PedidosService } from '../services/pedidos.service';
 import { ProdutosService } from '../services/produtos.service';
 
@@ -31,6 +32,8 @@ interface PedidoFormModel {
   formaPagamento: '' | PedidoPaymentMethod;
   trocoPara: number | null;
   observacoesPedido: string;
+  status: PedidoStatus;
+  justificativaCancelamento: string;
 }
 
 @Component({
@@ -73,9 +76,11 @@ interface PedidoFormModel {
             <span>{{ filteredPedidos.length }} pedidos encontrados · {{ pedidos.length }} cadastrados</span>
           </div>
 
-          <button class="modal-primary-action pedidos-head-action" type="button" (click)="openCreateModal()">
-            Novo pedido
-          </button>
+          @if (canWritePedidos) {
+            <button class="modal-primary-action pedidos-head-action" type="button" (click)="openCreateModal()">
+              Novo pedido
+            </button>
+          }
         </div>
 
         <div class="pedidos-list">
@@ -88,16 +93,21 @@ interface PedidoFormModel {
                   <small>{{ formatDateTime(pedido.createdAt) }}</small>
                 </div>
 
-                <span
-                  class="pedido-status"
-                  [class.aberto]="pedido.status === 'aberto'"
-                  [class.em-preparo]="pedido.status === 'em_preparo'"
-                  [class.saiu-entrega]="pedido.status === 'saiu_entrega'"
-                  [class.entregue]="pedido.status === 'entregue'"
-                  [class.cancelado]="pedido.status === 'cancelado'"
-                >
-                  {{ getStatusLabel(pedido.status) }}
-                </span>
+                <div class="pedido-badges">
+                  <span
+                    class="pedido-status"
+                    [class.aberto]="pedido.status === 'aberto'"
+                    [class.em-preparo]="pedido.status === 'em_preparo'"
+                    [class.saiu-entrega]="pedido.status === 'saiu_entrega'"
+                    [class.entregue]="pedido.status === 'entregue'"
+                    [class.cancelado]="pedido.status === 'cancelado'"
+                  >
+                    {{ getStatusLabel(pedido.status) }}
+                  </span>
+                  <span class="payment-status" [class.confirmed]="pedido.pagamentoConfirmado" [class.pending]="!pedido.pagamentoConfirmado">
+                    {{ getPaymentStatusLabel(pedido) }}
+                  </span>
+                </div>
               </header>
 
               <div class="pedido-card-body">
@@ -119,46 +129,75 @@ interface PedidoFormModel {
                     <span>Total</span>
                     <strong>{{ formatCurrency(pedido.total) }}</strong>
                   </div>
+                  <div>
+                    <span>Pagamento</span>
+                    <strong>{{ pedido.pagamentoConfirmado ? 'Confirmado' : 'Pendente' }}</strong>
+                  </div>
                 </div>
               </div>
 
               <footer class="pedido-card-actions">
                 <button type="button" (click)="openDetails(pedido)">Visualizar</button>
-                <button type="button" [disabled]="!canEdit(pedido)" (click)="openEditModal(pedido)">Editar</button>
-                <select
-                  class="pedido-status-select"
-                  name="status-{{ pedido.id }}"
-                  [ngModel]="pedido.status"
-                  (ngModelChange)="changeStatus(pedido, $event)"
-                  aria-label="Alterar status do pedido"
-                >
-                  @for (status of statusOptions; track status.value) {
-                    <option [value]="status.value">{{ status.label }}</option>
+                @if (canWritePedidos) {
+                  <button type="button" [disabled]="!canEdit(pedido)" (click)="openEditModal(pedido)">Editar</button>
+                  @if (!pedido.pagamentoConfirmado) {
+                    <button class="success" type="button" (click)="confirmPayment(pedido)">Confirmar pagamento</button>
                   }
-                </select>
-                <button class="danger" type="button" [disabled]="pedido.status === 'cancelado'" (click)="cancelPedido(pedido)">Cancelar</button>
-                <button class="success" type="button" [disabled]="pedido.status === 'entregue'" (click)="markAsDelivered(pedido)">Entregue</button>
+                }
+
+                <div class="pedido-status-stepper" [class.readonly]="!canWritePedidos" [class.blocked]="!isWorkflowStatus(pedido)">
+                  <button
+                    type="button"
+                    aria-label="Regredir status do pedido"
+                    [disabled]="!canGoPreviousStatus(pedido)"
+                    (click)="regredirStatusPedido(pedido)"
+                  >
+                    ←
+                  </button>
+                  <span
+                    class="pedido-status"
+                    [class.aberto]="pedido.status === 'aberto'"
+                    [class.em-preparo]="pedido.status === 'em_preparo'"
+                    [class.saiu-entrega]="pedido.status === 'saiu_entrega'"
+                    [class.entregue]="pedido.status === 'entregue'"
+                    [class.cancelado]="pedido.status === 'cancelado'"
+                  >
+                    {{ getStatusLabel(pedido.status) }}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Avançar status do pedido"
+                    [disabled]="!canGoNextStatus(pedido)"
+                    (click)="avancarStatusPedido(pedido)"
+                  >
+                    →
+                  </button>
+                </div>
               </footer>
             </article>
           } @empty {
             <section class="empty-state pedidos-empty-state">
               <strong>Nenhum pedido para entrega cadastrado ainda.</strong>
               <span>Crie o primeiro pedido para controlar cliente, endereço, itens, pagamento e status.</span>
-              <button type="button" (click)="openCreateModal()">Criar primeiro pedido</button>
+              @if (canWritePedidos) {
+                <button type="button" (click)="openCreateModal()">Criar primeiro pedido</button>
+              }
             </section>
           }
         </div>
       </section>
 
-      <button
-        class="floating-comanda-button"
-        type="button"
-        aria-label="Criar novo pedido para entrega"
-        (click)="openCreateModal()"
-      >
-        <app-icon name="bell" [size]="22" />
-        <span>Novo pedido</span>
-      </button>
+      @if (canWritePedidos) {
+        <button
+          class="floating-comanda-button"
+          type="button"
+          aria-label="Criar novo pedido para entrega"
+          (click)="openCreateModal()"
+        >
+          <app-icon name="bell" [size]="22" />
+          <span>Novo pedido</span>
+        </button>
+      }
 
       @if (pedidoModalOpen) {
         <div class="comanda-modal-overlay" role="presentation">
@@ -213,8 +252,11 @@ interface PedidoFormModel {
                     <input
                       type="tel"
                       name="telefone"
+                      maxlength="15"
+                      inputmode="tel"
                       placeholder="(00) 00000-0000"
-                      [(ngModel)]="form.telefone"
+                      [ngModel]="form.telefone"
+                      (ngModelChange)="onTelefoneChange($event)"
                     />
                   </label>
 
@@ -297,6 +339,31 @@ interface PedidoFormModel {
                         placeholder="Ex.: 100.00"
                         [(ngModel)]="form.trocoPara"
                       />
+                    </label>
+                  }
+
+                  @if (editingPedido) {
+                    <label>
+                      Status do pedido
+                      <select name="statusPedido" [(ngModel)]="form.status" (ngModelChange)="onStatusFormChange($event)">
+                        @for (status of statusOptions; track status.value) {
+                          <option [value]="status.value">{{ status.label }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
+
+                  @if (editingPedido && form.status === 'cancelado') {
+                    <label class="span-2">
+                      Justificativa do cancelamento
+                      <textarea
+                        name="justificativaCancelamento"
+                        rows="3"
+                        required
+                        placeholder="Explique o motivo do cancelamento do pedido."
+                        [(ngModel)]="form.justificativaCancelamento"
+                        (ngModelChange)="errorMessage = ''"
+                      ></textarea>
                     </label>
                   }
 
@@ -512,9 +579,13 @@ interface PedidoFormModel {
               <section class="pedido-details-card">
                 <h3>Pagamento</h3>
                 <dl>
+                  <div><dt>Status do pagamento</dt><dd>{{ getPaymentStatusLabel(detailsPedido) }}</dd></div>
                   <div><dt>Forma de pagamento</dt><dd>{{ getPaymentLabel(detailsPedido.formaPagamento) }}</dd></div>
                   <div><dt>Troco para</dt><dd>{{ detailsPedido.trocoPara ? formatCurrency(detailsPedido.trocoPara) : '-' }}</dd></div>
                   <div><dt>Observações do pedido</dt><dd>{{ detailsPedido.observacoesPedido || '-' }}</dd></div>
+                  @if (detailsPedido.status === 'cancelado') {
+                    <div><dt>Justificativa do cancelamento</dt><dd>{{ detailsPedido.justificativaCancelamento || '-' }}</dd></div>
+                  }
                   <div><dt>Total</dt><dd>{{ formatCurrency(detailsPedido.total) }}</dd></div>
                 </dl>
               </section>
@@ -542,6 +613,7 @@ export class PedidosPageComponent {
   private readonly pedidosService = inject(PedidosService);
   private readonly clientesService = inject(ClientesService);
   private readonly produtosService = inject(ProdutosService);
+  private readonly authService = inject(AuthService);
 
   protected search = '';
   protected feedbackMessage = '';
@@ -562,6 +634,8 @@ export class PedidosPageComponent {
     { value: 'entregue', label: 'Entregue' },
     { value: 'cancelado', label: 'Cancelado' },
   ];
+
+  private readonly workflowStatusSequence: PedidoStatus[] = ['aberto', 'em_preparo', 'saiu_entrega', 'entregue'];
 
   protected readonly paymentOptions: { value: PedidoPaymentMethod; label: string }[] = [
     { value: 'dinheiro', label: 'Dinheiro' },
@@ -633,8 +707,13 @@ export class PedidosPageComponent {
       .reduce((total, pedido) => total + pedido.total, 0);
   }
 
+  protected get canWritePedidos(): boolean {
+    return this.authService.canWrite('pedidos');
+  }
+
   protected get canSave(): boolean {
-    return Boolean(this.form.clienteId) && Boolean(this.form.enderecoEntrega.trim()) && this.items.length > 0;
+    const hasCancellationReason = this.form.status !== 'cancelado' || Boolean(this.form.justificativaCancelamento.trim());
+    return this.canWritePedidos && Boolean(this.form.clienteId) && Boolean(this.form.enderecoEntrega.trim()) && this.items.length > 0 && hasCancellationReason;
   }
 
   protected get selectedClienteLabel(): string {
@@ -643,6 +722,10 @@ export class PedidosPageComponent {
   }
 
   protected openCreateModal(): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.feedbackMessage = '';
     this.errorMessage = '';
     this.editingPedido = null;
@@ -656,8 +739,12 @@ export class PedidosPageComponent {
   }
 
   protected openEditModal(pedido: Pedido): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     if (!this.canEdit(pedido)) {
-      this.feedbackMessage = 'Apenas pedidos abertos ou em preparo podem ser editados.';
+      this.feedbackMessage = 'Pedidos cancelados não podem ser editados.';
       return;
     }
 
@@ -678,6 +765,8 @@ export class PedidosPageComponent {
       formaPagamento: pedido.formaPagamento ?? '',
       trocoPara: pedido.trocoPara ?? null,
       observacoesPedido: pedido.observacoesPedido ?? '',
+      status: pedido.status,
+      justificativaCancelamento: pedido.justificativaCancelamento ?? '',
     };
     this.items = pedido.itens.map((item) => ({ ...item }));
     this.productSearch = '';
@@ -693,6 +782,10 @@ export class PedidosPageComponent {
   }
 
   protected savePedido(): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.errorMessage = '';
     const selectedCliente = this.clientes.find((cliente) => cliente.id === this.form.clienteId);
 
@@ -717,6 +810,11 @@ export class PedidosPageComponent {
       return;
     }
 
+    if (this.editingPedido && this.form.status === 'cancelado' && !this.form.justificativaCancelamento.trim()) {
+      this.errorMessage = 'Informe a justificativa do cancelamento.';
+      return;
+    }
+
     const payload: PedidoPayload = {
       clienteId: selectedCliente.id,
       clienteNome: selectedCliente.nome,
@@ -731,6 +829,10 @@ export class PedidosPageComponent {
       formaPagamento: this.form.formaPagamento || undefined,
       trocoPara: this.form.formaPagamento === 'dinheiro' && this.form.trocoPara ? this.form.trocoPara : undefined,
       observacoesPedido: this.form.observacoesPedido.trim() || undefined,
+      status: this.editingPedido ? this.form.status : undefined,
+      justificativaCancelamento: this.editingPedido && this.form.status === 'cancelado'
+        ? this.form.justificativaCancelamento.trim()
+        : undefined,
     };
 
     const pedido = this.editingPedido
@@ -738,7 +840,9 @@ export class PedidosPageComponent {
       : this.pedidosService.createPedido(payload);
 
     if (!pedido) {
-      this.errorMessage = 'Não foi possível encontrar o pedido para edição.';
+      this.errorMessage = this.form.status === 'cancelado'
+        ? 'Informe a justificativa do cancelamento para salvar o pedido.'
+        : 'Não foi possível encontrar o pedido para edição.';
       return;
     }
 
@@ -757,6 +861,10 @@ export class PedidosPageComponent {
     this.detailsPedido = null;
   }
 
+  protected onTelefoneChange(value: string): void {
+    this.form.telefone = this.formatPhone(value);
+  }
+
   protected onClienteChange(clienteId: string): void {
     this.errorMessage = '';
     const cliente = this.clientes.find((currentCliente) => currentCliente.id === clienteId);
@@ -770,6 +878,14 @@ export class PedidosPageComponent {
 
     if (!this.form.enderecoEntrega.trim() && cliente.endereco) {
       this.form.enderecoEntrega = cliente.endereco;
+    }
+  }
+
+  protected onStatusFormChange(status: PedidoStatus): void {
+    this.errorMessage = '';
+
+    if (status !== 'cancelado') {
+      this.form.justificativaCancelamento = '';
     }
   }
 
@@ -796,6 +912,10 @@ export class PedidosPageComponent {
   }
 
   protected addItem(produto: Produto): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.errorMessage = '';
     const quantidade = Math.max(this.getQuantity(produto), 1);
     const existingItem = this.items.find((item) => item.productId === produto.id);
@@ -819,6 +939,10 @@ export class PedidosPageComponent {
   }
 
   protected changeItemQuantity(itemToChange: ItemPedido, nextQuantity: number): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     if (nextQuantity <= 0) {
       this.removeItem(itemToChange);
       return;
@@ -836,10 +960,18 @@ export class PedidosPageComponent {
   }
 
   protected removeItem(itemToRemove: ItemPedido): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.items = this.items.filter((item) => item.id !== itemToRemove.id);
   }
 
   protected clearPedido(): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
     this.items = [];
     this.errorMessage = '';
   }
@@ -853,23 +985,71 @@ export class PedidosPageComponent {
   }
 
   protected canEdit(pedido: Pedido): boolean {
-    return ['aberto', 'em_preparo'].includes(pedido.status);
+    return pedido.status !== 'cancelado';
   }
 
-  protected changeStatus(pedido: Pedido, status: string): void {
-    const nextStatus = status as PedidoStatus;
-    this.pedidosService.updateStatus(pedido.id, nextStatus);
+  protected confirmPayment(pedido: Pedido): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
+    if (pedido.pagamentoConfirmado) {
+      return;
+    }
+
+    this.pedidosService.confirmPayment(pedido.id);
+    this.feedbackMessage = `Pagamento do pedido ${pedido.codigo} confirmado.`;
+  }
+
+  protected isWorkflowStatus(pedido: Pedido): boolean {
+    return this.workflowStatusSequence.includes(pedido.status);
+  }
+
+  protected canGoPreviousStatus(pedido: Pedido): boolean {
+    if (!this.canWritePedidos || !this.isWorkflowStatus(pedido)) {
+      return false;
+    }
+
+    return this.workflowStatusSequence.indexOf(pedido.status) > 0;
+  }
+
+  protected canGoNextStatus(pedido: Pedido): boolean {
+    if (!this.canWritePedidos || !this.isWorkflowStatus(pedido)) {
+      return false;
+    }
+
+    return this.workflowStatusSequence.indexOf(pedido.status) < this.workflowStatusSequence.length - 1;
+  }
+
+  protected regredirStatusPedido(pedido: Pedido): void {
+    this.changeWorkflowStatus(pedido, -1);
+  }
+
+  protected avancarStatusPedido(pedido: Pedido): void {
+    this.changeWorkflowStatus(pedido, 1);
+  }
+
+  private changeWorkflowStatus(pedido: Pedido, direction: -1 | 1): void {
+    if (!this.ensureCanWrite()) {
+      return;
+    }
+
+    const currentIndex = this.workflowStatusSequence.indexOf(pedido.status);
+    const nextStatus = this.workflowStatusSequence[currentIndex + direction];
+
+    if (currentIndex === -1 || !nextStatus) {
+      this.feedbackMessage = `O status ${this.getStatusLabel(pedido.status).toLowerCase()} só pode ser alterado pela edição do pedido.`;
+      return;
+    }
+
+    const updatedPedido = this.pedidosService.updateStatus(pedido.id, nextStatus);
+
+    if (!updatedPedido) {
+      this.feedbackMessage = 'Não foi possível alterar o status deste pedido.';
+      return;
+    }
+
     this.feedbackMessage = `Pedido ${pedido.codigo} marcado como ${this.getStatusLabel(nextStatus).toLowerCase()}.`;
-  }
-
-  protected cancelPedido(pedido: Pedido): void {
-    this.pedidosService.updateStatus(pedido.id, 'cancelado');
-    this.feedbackMessage = `Pedido ${pedido.codigo} cancelado.`;
-  }
-
-  protected markAsDelivered(pedido: Pedido): void {
-    this.pedidosService.updateStatus(pedido.id, 'entregue');
-    this.feedbackMessage = `Pedido ${pedido.codigo} marcado como entregue.`;
   }
 
   protected getItemsCount(pedido: Pedido): number {
@@ -878,6 +1058,10 @@ export class PedidosPageComponent {
 
   protected getStatusLabel(status: PedidoStatus): string {
     return this.statusOptions.find((option) => option.value === status)?.label ?? status;
+  }
+
+  protected getPaymentStatusLabel(pedido: Pedido): string {
+    return pedido.pagamentoConfirmado ? 'Pagamento confirmado' : 'Pagamento pendente';
   }
 
   protected getPaymentLabel(payment?: PedidoPaymentMethod): string {
@@ -917,6 +1101,34 @@ export class PedidosPageComponent {
     }).format(new Date(value));
   }
 
+  private ensureCanWrite(): boolean {
+    if (this.canWritePedidos) {
+      return true;
+    }
+
+    this.errorMessage = 'Você não tem permissão de escrita em Pedidos.';
+    this.feedbackMessage = 'Você não tem permissão para alterar pedidos.';
+    return false;
+  }
+
+  private formatPhone(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+
+    if (digits.length <= 2) {
+      return digits;
+    }
+
+    if (digits.length <= 6) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    }
+
+    if (digits.length <= 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+
   private initializeProductQuantities(): void {
     this.productQuantities = this.activeProducts.reduce<Record<string, number>>((quantities, produto) => {
       quantities[produto.id] = 1;
@@ -938,6 +1150,8 @@ export class PedidosPageComponent {
       formaPagamento: '',
       trocoPara: null,
       observacoesPedido: '',
+      status: 'aberto',
+      justificativaCancelamento: '',
     };
   }
 }

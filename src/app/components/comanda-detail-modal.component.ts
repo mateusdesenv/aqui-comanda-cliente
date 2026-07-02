@@ -47,9 +47,11 @@ type CategoryTab = ProductCategory | 'Todos';
               </span>
             </div>
 
-            <button class="modal-primary-action modal-header-action" type="button" (click)="createForMesa.emit(mesa)">
-              Adicionar nova comanda
-            </button>
+            @if (canWrite) {
+              <button class="modal-primary-action modal-header-action" type="button" (click)="createForMesa.emit(mesa)">
+                Adicionar nova comanda
+              </button>
+            }
           </div>
 
           <p>
@@ -63,9 +65,11 @@ type CategoryTab = ProductCategory | 'Todos';
               <strong>Nenhuma comanda aberta nesta mesa</strong>
               <span>Para lançar itens, crie uma comanda e associe diretamente à Mesa {{ displayMesaNumber }}.</span>
             </div>
-            <button class="modal-primary-action" type="button" (click)="createForMesa.emit(mesa)">
-              Adicionar nova comanda
-            </button>
+            @if (canWrite) {
+              <button class="modal-primary-action" type="button" (click)="createForMesa.emit(mesa)">
+                Adicionar nova comanda
+              </button>
+            }
           </section>
         } @else {
           <div class="mesa-comanda-selector">
@@ -123,7 +127,7 @@ type CategoryTab = ProductCategory | 'Todos';
                           <button
                             type="button"
                             aria-label="Diminuir quantidade"
-                            [disabled]="getQuantity(produto) === 0"
+                            [disabled]="!canWrite || getQuantity(produto) === 0"
                             (click)="decrementQuantity(produto)"
                           >
                             -
@@ -132,13 +136,14 @@ type CategoryTab = ProductCategory | 'Todos';
                           <button
                             type="button"
                             aria-label="Aumentar quantidade"
+                            [disabled]="!canWrite"
                             (click)="incrementQuantity(produto)"
                           >
                             +
                           </button>
                         </div>
 
-                        <button class="add-product-button" type="button" (click)="addItem(produto)">
+                        <button class="add-product-button" type="button" [disabled]="!canWrite" (click)="addItem(produto)">
                           Adicionar
                         </button>
                       </div>
@@ -157,7 +162,7 @@ type CategoryTab = ProductCategory | 'Todos';
             <section class="detail-panel order-panel" aria-label="Itens lançados">
               <div class="detail-panel-header order-header">
                 <h3>Itens da comanda</h3>
-                <button class="clear-order-button" type="button" (click)="clearComanda()">
+                <button class="clear-order-button" type="button" [disabled]="!canWrite" (click)="clearComanda()">
                   Limpar comanda
                 </button>
               </div>
@@ -181,13 +186,13 @@ type CategoryTab = ProductCategory | 'Todos';
                     <div class="order-item-row" role="row">
                       <strong role="cell">{{ item.nome }}</strong>
                       <div role="cell" class="inline-quantity-control" [attr.aria-label]="'Quantidade de ' + item.nome">
-                        <button type="button" aria-label="Diminuir item" (click)="changeItemQuantity(item, item.quantidade - 1)">-</button>
+                        <button type="button" aria-label="Diminuir item" [disabled]="!canWrite" (click)="changeItemQuantity(item, item.quantidade - 1)">-</button>
                         <span>{{ item.quantidade }}</span>
-                        <button type="button" aria-label="Aumentar item" (click)="changeItemQuantity(item, item.quantidade + 1)">+</button>
+                        <button type="button" aria-label="Aumentar item" [disabled]="!canWrite" (click)="changeItemQuantity(item, item.quantidade + 1)">+</button>
                       </div>
                       <span role="cell">{{ formatCurrency(item.precoUnitario) }}</span>
                       <span role="cell">{{ formatCurrency(item.subtotal) }}</span>
-                      <button type="button" (click)="removeItem(item)">Remover</button>
+                      <button type="button" [disabled]="!canWrite" (click)="removeItem(item)">Remover</button>
                     </div>
                   } @empty {
                     <div class="empty-order-state">
@@ -211,6 +216,7 @@ type CategoryTab = ProductCategory | 'Todos';
 })
 export class ComandaDetailModalComponent implements OnChanges {
   @Input({ required: true }) mesa!: Mesa;
+  @Input() canWrite = true;
   @Output() close = new EventEmitter<void>();
   @Output() createForMesa = new EventEmitter<Mesa>();
 
@@ -296,6 +302,10 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected incrementQuantity(produto: Produto): void {
+    if (!this.canWrite) {
+      return;
+    }
+
     this.productQuantities = {
       ...this.productQuantities,
       [produto.id]: this.getQuantity(produto) + 1,
@@ -303,6 +313,10 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected decrementQuantity(produto: Produto): void {
+    if (!this.canWrite) {
+      return;
+    }
+
     this.productQuantities = {
       ...this.productQuantities,
       [produto.id]: Math.max(this.getQuantity(produto) - 1, 0),
@@ -310,7 +324,7 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected addItem(produto: Produto): void {
-    if (!this.selectedComandaId) {
+    if (!this.canWrite || !this.selectedComandaId) {
       return;
     }
 
@@ -337,6 +351,10 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected changeItemQuantity(itemToChange: ItemComanda, nextQuantity: number): void {
+    if (!this.canWrite) {
+      return;
+    }
+
     if (nextQuantity <= 0) {
       this.removeItem(itemToChange);
       return;
@@ -355,11 +373,19 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected removeItem(itemToRemove: ItemComanda): void {
+    if (!this.canWrite) {
+      return;
+    }
+
     this.items = this.items.filter((item) => item.id !== itemToRemove.id);
     this.persistItems();
   }
 
   protected clearComanda(): void {
+    if (!this.canWrite) {
+      return;
+    }
+
     this.items = [];
     this.persistItems();
     this.syncSelectedComandaItems();
