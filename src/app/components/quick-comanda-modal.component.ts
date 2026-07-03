@@ -1,4 +1,12 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+  inject,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Cliente, Comanda, ItemComanda, Mesa, ProductCategory, Produto } from '../models/app-data';
@@ -9,15 +17,23 @@ import { ProdutosService } from '../services/produtos.service';
 
 type CategoryTab = ProductCategory | 'Todos';
 type ClienteComandaMode = 'cadastrado' | 'manual';
+type QuickComandaStep = 'cliente' | 'produtos' | 'resumo';
+type ProductViewMode = 'lista' | 'grid';
+
+interface QuickComandaWorkflowTab {
+  id: QuickComandaStep;
+  label: string;
+  helper: string;
+}
 
 @Component({
   selector: 'app-quick-comanda-modal',
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <div class="comanda-modal-overlay" role="presentation">
+    <div class="comanda-modal-overlay quick-comanda-fullscreen-overlay" role="presentation">
       <section
-        class="comanda-modal quick-comanda-modal"
+        class="comanda-modal quick-comanda-modal quick-comanda-tabs-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="quick-comanda-modal-title"
@@ -31,7 +47,7 @@ type ClienteComandaMode = 'cadastrado' | 'manual';
           X
         </button>
 
-        <header class="comanda-modal-header">
+        <header class="comanda-modal-header quick-tabs-modal-header">
           <button class="modal-back-button" type="button" (click)="close.emit()">
             ← Voltar ao mapa de comandas
           </button>
@@ -42,221 +58,553 @@ type ClienteComandaMode = 'cadastrado' | 'manual';
           </div>
 
           <p>
-            {{ isEditing ? 'Edite o responsável, a mesa vinculada e os itens desta comanda.' : 'Selecione um cliente cadastrado ou informe o nome de um cliente não cadastrado.' }}
-            Sem mesa, a comanda fica como rápida em aberto.
+            {{
+              isEditing
+                ? 'Edite a comanda em etapas: responsável, produtos e revisão final.'
+                : 'Crie a comanda em etapas: identifique o cliente, lance o consumo e confirme o resumo.'
+            }}
           </p>
         </header>
 
-        <div class="quick-customer-strip enhanced-customer-strip">
-          <fieldset class="customer-mode-card">
-            <legend>Cliente da comanda</legend>
-            <div class="segmented-choice" role="radiogroup" aria-label="Tipo de cliente">
-              <label [class.active]="clienteMode === 'cadastrado'">
-                <input
-                  type="radio"
-                  name="clienteMode"
-                  value="cadastrado"
-                  [(ngModel)]="clienteMode"
-                  [disabled]="!canEditComanda"
-                  (ngModelChange)="onClienteModeChange()"
-                />
-                Cliente cadastrado
-              </label>
-              <label [class.active]="clienteMode === 'manual'">
-                <input
-                  type="radio"
-                  name="clienteMode"
-                  value="manual"
-                  [(ngModel)]="clienteMode"
-                  [disabled]="!canEditComanda"
-                  (ngModelChange)="onClienteModeChange()"
-                />
-                Não cadastrado
-              </label>
-            </div>
-
-            @if (clienteMode === 'cadastrado') {
-              <label>
-                Cliente responsável pela comanda
-                <select name="cliente" [(ngModel)]="selectedClienteId" [disabled]="!canEditComanda" (ngModelChange)="errorMessage = ''">
-                  <option value="">Selecione um cliente</option>
-                  @for (cliente of clientes; track cliente.id) {
-                    <option [value]="cliente.id">
-                      {{ cliente.nome }} — {{ cliente.cpf }}
-                    </option>
-                  }
-                </select>
-              </label>
-            } @else {
-              <label>
-                Nome do cliente não cadastrado
-                <input
-                  type="text"
-                  name="manualClienteNome"
-                  placeholder="Ex.: João da Silva"
-                  [(ngModel)]="manualClienteNome"
-                  [disabled]="!canEditComanda"
-                  (ngModelChange)="errorMessage = ''"
-                />
-              </label>
-              <small>Esse nome será usado apenas nesta comanda. O cliente não será cadastrado automaticamente.</small>
-            }
-
-            <div class="customer-link-indicator" [class.manual]="clienteMode === 'manual'">
-              {{ clienteMode === 'manual' ? 'Comanda com nome manual' : 'Comanda vinculada ao cadastro de clientes' }}
-            </div>
-          </fieldset>
-
-          <label class="quick-mesa-field">
-            Mesa vinculada <span class="optional-label">opcional</span>
-            <select name="mesa" [(ngModel)]="selectedMesaId" [disabled]="!canEditComanda" (ngModelChange)="errorMessage = ''">
-              <option value="">Sem mesa — comanda rápida</option>
-              @for (mesa of mesasDisponiveis; track mesa.id) {
-                <option [value]="mesa.id">
-                  Mesa {{ formatMesaNumber(mesa) }}{{ mesa.nome ? ' — ' + mesa.nome : '' }}
-                </option>
-              }
-            </select>
-          </label>
-        </div>
-
-        @if (clientes.length === 0 && clienteMode === 'cadastrado') {
-          <div class="quick-helper-box quick-client-helper">
-            <div>
-              <strong>Nenhum cliente cadastrado</strong>
-              <span>Use a opção “Não cadastrado” ou cadastre um cliente na base.</span>
-            </div>
-            <a routerLink="/clientes" (click)="close.emit()">Ir para Clientes</a>
-          </div>
-        }
+        <nav class="quick-workflow-tabs" aria-label="Etapas da criação de comanda">
+          @for (tab of workflowTabs; track tab.id; let index = $index) {
+            <button
+              class="quick-workflow-tab"
+              type="button"
+              [class.active]="activeStep === tab.id"
+              [class.completed]="isStepCompleted(tab.id)"
+              [class.locked]="!canSelectStep(tab.id)"
+              [attr.aria-selected]="activeStep === tab.id"
+              [attr.aria-controls]="'quick-comanda-step-' + tab.id"
+              role="tab"
+              (click)="selectStep(tab.id)"
+            >
+              <span class="quick-tab-index">{{ isStepCompleted(tab.id) ? '✓' : index + 1 }}</span>
+              <span>
+                <strong>{{ tab.label }}</strong>
+                <small>{{ tab.helper }}</small>
+              </span>
+            </button>
+          }
+        </nav>
 
         @if (errorMessage) {
-          <div class="quick-form-feedback">{{ errorMessage }}</div>
+          <div class="quick-form-feedback quick-tabs-feedback">{{ errorMessage }}</div>
         }
 
-        <div class="comanda-detail-grid">
-          <section class="detail-panel menu-panel" aria-label="Cardápio">
-            <div class="detail-panel-header">
-              <h3>Cardápio</h3>
-            </div>
-
-            @if (activeProducts.length > 0) {
-              <div class="category-tabs" role="tablist" aria-label="Categorias do cardápio">
-                @for (category of categories; track category) {
-                  <button
-                    class="category-tab"
-                    [class.active]="activeCategory === category"
-                    type="button"
-                    role="tab"
-                    [attr.aria-selected]="activeCategory === category"
-                    (click)="setActiveCategory(category)"
-                  >
-                    {{ category }}
-                  </button>
-                }
+        <div class="quick-step-shell">
+          @if (activeStep === 'cliente') {
+            <section
+              id="quick-comanda-step-cliente"
+              class="quick-step-panel quick-customer-step"
+              role="tabpanel"
+              aria-label="Cliente e mesa"
+            >
+              <div class="quick-step-intro">
+                <span>Etapa 1</span>
+                <strong>Defina o responsável e o destino da comanda.</strong>
               </div>
 
-              <div class="product-grid">
-                @for (produto of filteredProducts; track produto.id) {
-                  <article class="product-card">
+              <div class="quick-identification-grid">
+                <section class="quick-ident-card quick-client-card" aria-label="Cliente da comanda">
+                  <header class="quick-ident-card-header">
+                    <span>01</span>
                     <div>
-                      <strong>{{ produto.nome }}</strong>
-                      <p>{{ produto.descricao }}</p>
+                      <h3>Cliente da comanda</h3>
+                      <p>Escolha um cliente salvo ou use um nome rápido para atendimento.</p>
+                    </div>
+                  </header>
+
+                  <div
+                    class="client-mode-cards"
+                    role="radiogroup"
+                    aria-label="Tipo de cliente da comanda"
+                  >
+                    <label class="client-mode-option" [class.active]="clienteMode === 'cadastrado'">
+                      <input
+                        type="radio"
+                        name="clienteMode"
+                        value="cadastrado"
+                        [(ngModel)]="clienteMode"
+                        [disabled]="!canEditComanda"
+                        (ngModelChange)="onClienteModeChange()"
+                      />
+                      <span>
+                        <strong>Cliente cadastrado</strong>
+                        <small>Vincular ao cadastro de clientes</small>
+                      </span>
+                    </label>
+
+                    <label class="client-mode-option" [class.active]="clienteMode === 'manual'">
+                      <input
+                        type="radio"
+                        name="clienteMode"
+                        value="manual"
+                        [(ngModel)]="clienteMode"
+                        [disabled]="!canEditComanda"
+                        (ngModelChange)="onClienteModeChange()"
+                      />
+                      <span>
+                        <strong>Não cadastrado</strong>
+                        <small>Informar apenas o nome</small>
+                      </span>
+                    </label>
+                  </div>
+
+                  @if (clienteMode === 'cadastrado') {
+                    <label class="quick-form-field">
+                      Cliente responsável pela comanda
+                      <select
+                        name="cliente"
+                        [(ngModel)]="selectedClienteId"
+                        [disabled]="!canEditComanda"
+                        (ngModelChange)="clearStepFeedback()"
+                      >
+                        <option value="">Selecione um cliente</option>
+                        @for (cliente of clientes; track cliente.id) {
+                          <option [value]="cliente.id">
+                            {{ cliente.nome }} — {{ cliente.cpf }}
+                          </option>
+                        }
+                      </select>
+                    </label>
+                  } @else {
+                    <label class="quick-form-field">
+                      Nome do cliente não cadastrado
+                      <input
+                        type="text"
+                        name="manualClienteNome"
+                        placeholder="Ex.: João da Silva"
+                        [(ngModel)]="manualClienteNome"
+                        [disabled]="!canEditComanda"
+                        (ngModelChange)="clearStepFeedback()"
+                      />
+                    </label>
+                    <small class="manual-client-note">
+                      Esse nome será usado apenas nesta comanda. O cliente não será cadastrado
+                      automaticamente.
+                    </small>
+                  }
+
+                  <div class="customer-link-indicator" [class.manual]="clienteMode === 'manual'">
+                    {{ clienteMode === 'manual' ? 'Cliente não cadastrado' : 'Cliente cadastrado' }}
+                  </div>
+                </section>
+
+                <section
+                  class="quick-ident-card quick-destination-card"
+                  aria-label="Destino da comanda"
+                >
+                  <header class="quick-ident-card-header">
+                    <span>02</span>
+                    <div>
+                      <h3>Destino da comanda</h3>
+                      <p>Defina se o consumo vai para uma mesa ou ficará como comanda rápida.</p>
+                    </div>
+                  </header>
+
+                  @if (isMesaPreselected) {
+                    <article class="linked-mesa-card locked">
+                      <span>Mesa vinculada</span>
+                      <strong>{{ selectedMesaLabel }}</strong>
+                      <p>Esta comanda será criada dentro desta mesa.</p>
+                    </article>
+                  } @else {
+                    <label class="quick-form-field">
+                      Mesa vinculada <span class="optional-label">opcional</span>
+                      <select
+                        name="mesa"
+                        [(ngModel)]="selectedMesaId"
+                        [disabled]="!canEditComanda"
+                        (ngModelChange)="clearStepFeedback()"
+                      >
+                        <option value="">Sem mesa — comanda rápida</option>
+                        @for (mesa of mesasDisponiveis; track mesa.id) {
+                          <option [value]="mesa.id">
+                            Mesa {{ formatMesaNumber(mesa)
+                            }}{{ mesa.nome ? ' — ' + mesa.nome : '' }}
+                          </option>
+                        }
+                      </select>
+                    </label>
+
+                    <article class="linked-mesa-card" [class.quick]="!selectedMesaId">
+                      <span>{{
+                        selectedMesaId ? 'Destino selecionado' : 'Sem mesa vinculada'
+                      }}</span>
+                      <strong>{{ selectedMesaLabel }}</strong>
+                      <p>
+                        {{
+                          selectedMesaId
+                            ? 'A comanda será vinculada à mesa escolhida.'
+                            : 'Sem mesa, ela ficará como comanda rápida em aberto.'
+                        }}
+                      </p>
+                    </article>
+                  }
+                </section>
+              </div>
+
+              @if (clientes.length === 0 && clienteMode === 'cadastrado') {
+                <div class="quick-helper-box quick-client-helper">
+                  <div>
+                    <strong>Nenhum cliente cadastrado</strong>
+                    <span>Use a opção “Não cadastrado” ou cadastre um cliente na base.</span>
+                  </div>
+                  <a routerLink="/clientes" (click)="close.emit()">Ir para Clientes</a>
+                </div>
+              }
+            </section>
+          }
+
+          @if (activeStep === 'produtos') {
+            <section
+              id="quick-comanda-step-produtos"
+              class="quick-step-panel"
+              role="tabpanel"
+              aria-label="Produtos"
+            >
+              <div class="quick-step-intro quick-products-intro">
+                <span>Etapa 2</span>
+                <strong>Lance os produtos consumidos e acompanhe o total em tempo real.</strong>
+              </div>
+
+              <div class="quick-products-toolbar" aria-label="Busca e filtros do cardápio">
+                <label class="quick-product-search">
+                  Buscar produto
+                  <input
+                    type="search"
+                    name="productSearch"
+                    placeholder="Digite nome, descrição ou categoria"
+                    [(ngModel)]="productSearch"
+                    (ngModelChange)="clearStepFeedback()"
+                  />
+                </label>
+
+                <div
+                  class="category-tabs quick-category-tabs"
+                  role="tablist"
+                  aria-label="Categorias do cardápio"
+                >
+                  @for (category of categories; track category) {
+                    <button
+                      class="category-tab"
+                      [class.active]="activeCategory === category"
+                      type="button"
+                      role="tab"
+                      [attr.aria-selected]="activeCategory === category"
+                      (click)="setActiveCategory(category)"
+                    >
+                      {{ category }}
+                    </button>
+                  }
+                </div>
+
+                <div
+                  class="view-toggle quick-product-view-toggle"
+                  role="group"
+                  aria-label="Visualização dos produtos"
+                >
+                  <button
+                    type="button"
+                    [class.active]="productViewMode === 'lista'"
+                    (click)="setProductViewMode('lista')"
+                  >
+                    Lista
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="productViewMode === 'grid'"
+                    (click)="setProductViewMode('grid')"
+                  >
+                    Grid
+                  </button>
+                </div>
+              </div>
+
+              <div class="comanda-detail-grid quick-products-step-grid">
+                <section class="detail-panel menu-panel" aria-label="Cardápio">
+                  <div class="detail-panel-header">
+                    <div>
+                      <h3>Produtos disponíveis</h3>
+                      <span>{{ filteredProducts.length }} resultado(s)</span>
+                    </div>
+                  </div>
+
+                  @if (activeProducts.length > 0) {
+                    <div
+                      class="product-grid quick-product-results"
+                      [class.product-list-view]="productViewMode === 'lista'"
+                      [class.product-grid-view]="productViewMode === 'grid'"
+                    >
+                      @for (produto of filteredProducts; track produto.id) {
+                        <article class="product-card" [class.selected]="isProductSelected(produto)">
+                          <div>
+                            <strong>{{ produto.nome }}</strong>
+                            <p>{{ produto.descricao }}</p>
+                            <span class="product-size-chip quick-product-size">{{ getProdutoTamanhoLabel(produto) }}</span>
+                          </div>
+
+                          <span class="product-price">{{ formatCurrency(produto.preco) }}</span>
+
+                          <div class="product-actions">
+                            <div
+                              class="quantity-control"
+                              [attr.aria-label]="'Quantidade de ' + produto.nome"
+                            >
+                              <button
+                                type="button"
+                                aria-label="Diminuir quantidade"
+                                [disabled]="!canEditComanda || getQuantity(produto) === 0"
+                                (click)="decrementQuantity(produto)"
+                              >
+                                -
+                              </button>
+                              <span>{{ getQuantity(produto) }}</span>
+                              <button
+                                type="button"
+                                aria-label="Aumentar quantidade"
+                                [disabled]="!canEditComanda"
+                                (click)="incrementQuantity(produto)"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            <button
+                              class="add-product-button"
+                              type="button"
+                              [disabled]="!canEditComanda"
+                              (click)="addItem(produto)"
+                            >
+                              {{ isProductSelected(produto) ? 'Adicionar mais' : 'Adicionar' }}
+                            </button>
+                          </div>
+                        </article>
+                      } @empty {
+                        <div class="empty-menu-category quick-empty-products">
+                          <strong>Nenhum produto encontrado</strong>
+                          <span>Ajuste a busca ou selecione outra categoria.</span>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="empty-menu-category">
+                      <strong>Nenhum produto ativo cadastrado</strong>
+                      <span>Cadastre ou ative produtos para lançá-los nas comandas.</span>
+                      <a routerLink="/cardapio" (click)="close.emit()">Cadastrar produto</a>
+                    </div>
+                  }
+                </section>
+
+                <section
+                  class="detail-panel order-panel quick-selected-panel"
+                  aria-label="Itens selecionados"
+                >
+                  <div class="detail-panel-header order-header">
+                    <div>
+                      <h3>Itens da comanda</h3>
+                      <span>{{ items.length }} {{ items.length === 1 ? 'item' : 'itens' }}</span>
+                    </div>
+                    <button
+                      class="clear-order-button"
+                      type="button"
+                      [disabled]="!canEditComanda || items.length === 0"
+                      (click)="clearComanda()"
+                    >
+                      Limpar seleção
+                    </button>
+                  </div>
+
+                  <div class="order-context-card">
+                    <span>Destino</span>
+                    <strong>{{ selectedMesaLabel }}</strong>
+                    <em>{{ selectedClienteLabel }}</em>
+                  </div>
+
+                  <div
+                    class="order-table compact-order-table"
+                    role="table"
+                    aria-label="Itens selecionados para a comanda"
+                  >
+                    <div class="order-table-head" role="row">
+                      <span role="columnheader">Item</span>
+                      <span role="columnheader">Qtd.</span>
+                      <span role="columnheader">Subtotal</span>
+                      <span role="columnheader">Ação</span>
                     </div>
 
-                    <span class="product-price">{{ formatCurrency(produto.preco) }}</span>
+                    <div class="order-table-body">
+                      @for (item of items; track item.id) {
+                        <div class="order-item-row" role="row">
+                          <strong role="cell">{{ item.nome }}</strong>
+                          <div
+                            role="cell"
+                            class="inline-quantity-control"
+                            [attr.aria-label]="'Quantidade de ' + item.nome"
+                          >
+                            <button
+                              type="button"
+                              aria-label="Diminuir item"
+                              [disabled]="!canEditComanda"
+                              (click)="changeItemQuantity(item, item.quantidade - 1)"
+                            >
+                              -
+                            </button>
+                            <span>{{ item.quantidade }}</span>
+                            <button
+                              type="button"
+                              aria-label="Aumentar item"
+                              [disabled]="!canEditComanda"
+                              (click)="changeItemQuantity(item, item.quantidade + 1)"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span role="cell">{{ formatCurrency(item.subtotal) }}</span>
+                          <button
+                            type="button"
+                            [disabled]="!canEditComanda"
+                            (click)="removeItem(item)"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      } @empty {
+                        <div class="empty-order-state">
+                          <strong>Nenhum item selecionado</strong>
+                          <span>Escolha produtos do cardápio para montar a comanda.</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
 
-                    <div class="product-actions">
-                      <div class="quantity-control" [attr.aria-label]="'Quantidade de ' + produto.nome">
-                        <button
-                          type="button"
-                          aria-label="Diminuir quantidade"
-                          [disabled]="!canEditComanda || getQuantity(produto) === 0"
-                          (click)="decrementQuantity(produto)"
-                        >
-                          -
-                        </button>
-                        <span>{{ getQuantity(produto) }}</span>
-                        <button
-                          type="button"
-                          aria-label="Aumentar quantidade"
-                          [disabled]="!canEditComanda"
-                          (click)="incrementQuantity(produto)"
-                        >
-                          +
-                        </button>
+                  <footer class="order-total-panel">
+                    <span>Total parcial</span>
+                    <strong>{{ formatCurrency(getTotal()) }}</strong>
+                  </footer>
+                </section>
+              </div>
+            </section>
+          }
+
+          @if (activeStep === 'resumo') {
+            <section
+              id="quick-comanda-step-resumo"
+              class="quick-step-panel quick-summary-step"
+              role="tabpanel"
+              aria-label="Resumo"
+            >
+              <div class="quick-step-intro">
+                <span>Etapa 3</span>
+                <strong>Confira cliente, destino, itens e total antes de concluir.</strong>
+              </div>
+
+              <div class="quick-summary-grid enhanced-summary-grid">
+                <article class="quick-summary-card">
+                  <span>Cliente</span>
+                  <strong
+                    [class.registered-client-name]="
+                      clienteMode === 'cadastrado' && !!selectedClienteId
+                    "
+                    >{{ selectedClienteLabel }}</strong
+                  >
+                  <em>{{
+                    clienteMode === 'manual' ? 'Cliente não cadastrado' : 'Cliente cadastrado'
+                  }}</em>
+                </article>
+
+                <article class="quick-summary-card">
+                  <span>Destino</span>
+                  <strong>{{ selectedMesaLabel }}</strong>
+                  <em>{{
+                    selectedMesaId ? 'Comanda vinculada à mesa' : 'Comanda rápida em aberto'
+                  }}</em>
+                </article>
+
+                <article class="quick-summary-card">
+                  <span>Itens</span>
+                  <strong>{{ items.length }}</strong>
+                  <em>{{ items.length === 1 ? 'item selecionado' : 'itens selecionados' }}</em>
+                </article>
+
+                <article class="quick-summary-card total">
+                  <span>Total geral</span>
+                  <strong>{{ formatCurrency(getTotal()) }}</strong>
+                  <em>Valor final da comanda</em>
+                </article>
+              </div>
+
+              <div class="quick-summary-corrections" aria-label="Ações de correção do resumo">
+                <button type="button" (click)="selectStep('cliente')">Alterar cliente</button>
+                <button type="button" (click)="selectStep('produtos')">Alterar produtos</button>
+              </div>
+
+              <section
+                class="detail-panel quick-summary-items"
+                aria-label="Resumo dos itens da comanda"
+              >
+                <div class="detail-panel-header order-header">
+                  <h3>Pré-cupom da comanda</h3>
+                </div>
+
+                <div class="order-table" role="table" aria-label="Resumo dos itens selecionados">
+                  <div class="order-table-head" role="row">
+                    <span role="columnheader">Item</span>
+                    <span role="columnheader">Qtd.</span>
+                    <span role="columnheader">Valor unit.</span>
+                    <span role="columnheader">Subtotal</span>
+                  </div>
+
+                  <div class="order-table-body">
+                    @for (item of items; track item.id) {
+                      <div class="order-item-row summary-row" role="row">
+                        <strong role="cell">{{ item.nome }}</strong>
+                        <span role="cell">{{ item.quantidade }}</span>
+                        <span role="cell">{{ formatCurrency(item.precoUnitario) }}</span>
+                        <span role="cell">{{ formatCurrency(item.subtotal) }}</span>
                       </div>
+                    } @empty {
+                      <div class="empty-order-state">
+                        <strong>Nenhum item selecionado</strong>
+                        <span>Volte para Produtos e adicione ao menos um item.</span>
+                      </div>
+                    }
+                  </div>
+                </div>
 
-                      <button class="add-product-button" type="button" [disabled]="!canEditComanda" (click)="addItem(produto)">
-                        Adicionar
-                      </button>
-                    </div>
-                  </article>
-                }
-              </div>
-            } @else {
-              <div class="empty-menu-category">
-                <strong>Nenhum produto ativo cadastrado</strong>
-                <span>Cadastre ou ative produtos para lançá-los nas comandas.</span>
-                <a routerLink="/cardapio" (click)="close.emit()">Cadastrar produto</a>
-              </div>
+                <footer class="order-total-panel summary-total-panel">
+                  <span>Total da comanda</span>
+                  <strong>{{ formatCurrency(getTotal()) }}</strong>
+                </footer>
+              </section>
+            </section>
+          }
+        </div>
+
+        <footer class="quick-tabs-footer">
+          <div class="quick-footer-context">
+            <span>Etapa {{ activeStepIndex + 1 }} de 3</span>
+            <strong>{{ activeStepLabel }}</strong>
+            <small>{{ footerSummaryLabel }}</small>
+          </div>
+
+          <div class="quick-tabs-footer-actions">
+            <button class="modal-secondary-action" type="button" (click)="close.emit()">
+              Cancelar
+            </button>
+
+            @if (activeStep !== 'cliente') {
+              <button class="modal-secondary-action" type="button" (click)="previousStep()">
+                Voltar
+              </button>
             }
-          </section>
 
-          <section class="detail-panel order-panel" aria-label="Itens selecionados">
-            <div class="detail-panel-header order-header">
-              <h3>Itens selecionados</h3>
-              <button class="clear-order-button" type="button" [disabled]="!canEditComanda" (click)="clearComanda()">
-                Limpar seleção
+            @if (activeStep !== 'resumo') {
+              <button class="modal-primary-action" type="button" (click)="nextStep()">
+                Avançar
               </button>
-            </div>
-
-            <div class="order-context-card">
-              <span>Destino da comanda</span>
-              <strong>{{ selectedMesaLabel }}</strong>
-              <em>{{ clienteMode === 'manual' ? 'Cliente não cadastrado' : 'Cliente cadastrado' }}</em>
-            </div>
-
-            <div class="order-table" role="table" aria-label="Itens selecionados para a comanda">
-              <div class="order-table-head" role="row">
-                <span role="columnheader">Item</span>
-                <span role="columnheader">Qtd.</span>
-                <span role="columnheader">Valor unit.</span>
-                <span role="columnheader">Subtotal</span>
-                <span role="columnheader">Ação</span>
-              </div>
-
-              <div class="order-table-body">
-                @for (item of items; track item.id) {
-                  <div class="order-item-row" role="row">
-                    <strong role="cell">{{ item.nome }}</strong>
-                    <div role="cell" class="inline-quantity-control" [attr.aria-label]="'Quantidade de ' + item.nome">
-                      <button type="button" aria-label="Diminuir item" [disabled]="!canEditComanda" (click)="changeItemQuantity(item, item.quantidade - 1)">-</button>
-                      <span>{{ item.quantidade }}</span>
-                      <button type="button" aria-label="Aumentar item" [disabled]="!canEditComanda" (click)="changeItemQuantity(item, item.quantidade + 1)">+</button>
-                    </div>
-                    <span role="cell">{{ formatCurrency(item.precoUnitario) }}</span>
-                    <span role="cell">{{ formatCurrency(item.subtotal) }}</span>
-                    <button type="button" [disabled]="!canEditComanda" (click)="removeItem(item)">Remover</button>
-                  </div>
-                } @empty {
-                  <div class="empty-order-state">
-                    <strong>Nenhum item selecionado</strong>
-                    <span>Escolha produtos do cardápio para montar a comanda.</span>
-                  </div>
-                }
-              </div>
-            </div>
-
-            <footer class="order-total-panel">
-              <span>TOTAL DA COMANDA</span>
-              <strong>{{ formatCurrency(getTotal()) }}</strong>
-            </footer>
-
-            <div class="quick-modal-actions">
-              <button class="modal-secondary-action" type="button" (click)="close.emit()">
-                Cancelar
-              </button>
+            } @else {
               <button
                 class="modal-primary-action"
                 type="button"
@@ -265,9 +613,9 @@ type ClienteComandaMode = 'cadastrado' | 'manual';
               >
                 {{ primaryActionLabel }}
               </button>
-            </div>
-          </section>
-        </div>
+            }
+          </div>
+        </footer>
       </section>
     </div>
   `,
@@ -283,7 +631,16 @@ export class QuickComandaModalComponent implements OnChanges {
   private readonly mesasService = inject(MesasService);
   private readonly produtosService = inject(ProdutosService);
 
+  protected readonly workflowTabs: QuickComandaWorkflowTab[] = [
+    { id: 'cliente', label: 'Cliente e mesa', helper: 'Responsável e destino' },
+    { id: 'produtos', label: 'Produtos', helper: 'Cardápio e itens' },
+    { id: 'resumo', label: 'Resumo', helper: 'Revisão final' },
+  ];
+
+  protected activeStep: QuickComandaStep = 'cliente';
   protected activeCategory: CategoryTab = 'Todos';
+  protected productSearch = '';
+  protected productViewMode: ProductViewMode = 'lista';
   protected clienteMode: ClienteComandaMode = 'cadastrado';
   protected selectedClienteId = '';
   protected manualClienteNome = '';
@@ -302,12 +659,24 @@ export class QuickComandaModalComponent implements OnChanges {
     return Boolean(this.editingComanda);
   }
 
+  protected get isMesaPreselected(): boolean {
+    return Boolean(this.initialMesaId && !this.editingComanda);
+  }
+
   protected get modalTitle(): string {
     return this.isEditing ? 'Editar comanda' : 'Criar nova comanda';
   }
 
   protected get primaryActionLabel(): string {
-    return this.isEditing ? 'Salvar alterações' : 'Criar comanda';
+    if (this.isEditing) {
+      return 'Salvar alterações';
+    }
+
+    if (this.selectedMesaId) {
+      return `Criar comanda na ${this.selectedMesaLabel.replace(' — ', ' - ')}`;
+    }
+
+    return 'Criar comanda rápida';
   }
 
   protected get clientes(): Cliente[] {
@@ -331,11 +700,20 @@ export class QuickComandaModalComponent implements OnChanges {
   }
 
   protected get filteredProducts(): Produto[] {
-    if (this.activeCategory === 'Todos') {
-      return this.activeProducts;
-    }
+    const searchTerm = this.productSearch.trim().toLowerCase();
 
-    return this.activeProducts.filter((produto) => produto.categoria === this.activeCategory);
+    return this.activeProducts.filter((produto) => {
+      const matchesCategory =
+        this.activeCategory === 'Todos' || produto.categoria === this.activeCategory;
+      const matchesSearch =
+        !searchTerm ||
+        produto.nome.toLowerCase().includes(searchTerm) ||
+        produto.descricao.toLowerCase().includes(searchTerm) ||
+        produto.categoria.toLowerCase().includes(searchTerm) ||
+        this.getProdutoTamanhoLabel(produto).toLowerCase().includes(searchTerm);
+
+      return matchesCategory && matchesSearch;
+    });
   }
 
   protected get canEditComanda(): boolean {
@@ -350,8 +728,12 @@ export class QuickComandaModalComponent implements OnChanges {
     return Boolean(this.selectedClienteId);
   }
 
+  protected get hasValidItems(): boolean {
+    return this.items.length > 0 && this.items.every((item) => item.quantidade > 0);
+  }
+
   protected get canSave(): boolean {
-    return this.canEditComanda && this.hasValidCustomer && this.items.length > 0;
+    return this.canEditComanda && this.hasValidCustomer && this.hasValidItems;
   }
 
   protected get selectedMesaLabel(): string {
@@ -364,6 +746,37 @@ export class QuickComandaModalComponent implements OnChanges {
     return `Mesa ${this.formatMesaNumber(mesa)}${mesa.nome ? ' — ' + mesa.nome : ''}`;
   }
 
+  protected get selectedClienteLabel(): string {
+    if (this.clienteMode === 'manual') {
+      return this.manualClienteNome.trim() || 'Cliente não informado';
+    }
+
+    const cliente = this.clientes.find(
+      (currentCliente) => currentCliente.id === this.selectedClienteId,
+    );
+    return cliente?.nome ?? 'Cliente não selecionado';
+  }
+
+  protected get activeStepIndex(): number {
+    return Math.max(
+      this.workflowTabs.findIndex((tab) => tab.id === this.activeStep),
+      0,
+    );
+  }
+
+  protected get activeStepLabel(): string {
+    return this.workflowTabs[this.activeStepIndex]?.label ?? 'Cliente e mesa';
+  }
+
+  protected get footerSummaryLabel(): string {
+    const itemLabel = `${this.items.length} ${this.items.length === 1 ? 'item' : 'itens'}`;
+    return `${itemLabel} • ${this.formatCurrency(this.getTotal())}`;
+  }
+
+  protected clearStepFeedback(): void {
+    this.errorMessage = '';
+  }
+
   protected onClienteModeChange(): void {
     this.errorMessage = '';
     if (this.clienteMode === 'manual') {
@@ -374,8 +787,98 @@ export class QuickComandaModalComponent implements OnChanges {
     this.manualClienteNome = '';
   }
 
+  protected selectStep(step: QuickComandaStep): void {
+    if (step === this.activeStep) {
+      return;
+    }
+
+    if (this.canSelectStep(step)) {
+      this.activeStep = step;
+      this.errorMessage = '';
+      return;
+    }
+
+    if (step === 'produtos') {
+      this.validateCustomerStep();
+      return;
+    }
+
+    if (step === 'resumo') {
+      if (!this.validateCustomerStep()) {
+        return;
+      }
+      this.validateItemsStep();
+    }
+  }
+
+  protected canSelectStep(step: QuickComandaStep): boolean {
+    if (step === 'cliente') {
+      return true;
+    }
+
+    if (step === 'produtos') {
+      return this.hasValidCustomer;
+    }
+
+    return this.hasValidCustomer && this.hasValidItems;
+  }
+
+  protected isStepCompleted(step: QuickComandaStep): boolean {
+    if (step === 'cliente') {
+      return this.hasValidCustomer;
+    }
+
+    if (step === 'produtos') {
+      return this.hasValidItems;
+    }
+
+    return this.canSave;
+  }
+
+  protected nextStep(): void {
+    if (this.activeStep === 'cliente') {
+      if (!this.validateCustomerStep()) {
+        return;
+      }
+
+      this.activeStep = 'produtos';
+      this.errorMessage = '';
+      return;
+    }
+
+    if (this.activeStep === 'produtos') {
+      if (!this.validateItemsStep()) {
+        return;
+      }
+
+      this.activeStep = 'resumo';
+      this.errorMessage = '';
+    }
+  }
+
+  protected previousStep(): void {
+    this.errorMessage = '';
+
+    if (this.activeStep === 'resumo') {
+      this.activeStep = 'produtos';
+      return;
+    }
+
+    if (this.activeStep === 'produtos') {
+      this.activeStep = 'cliente';
+    }
+  }
+
   protected setActiveCategory(category: CategoryTab): void {
     this.activeCategory = category;
+  }
+
+  protected setProductViewMode(viewMode: ProductViewMode): void {
+    this.productViewMode = viewMode;
+  }
+
+  protected isProductSelected(produto: Produto): boolean {
+    return this.items.some((item) => item.productId === produto.id);
   }
 
   protected getQuantity(produto: Produto): number {
@@ -424,6 +927,7 @@ export class QuickComandaModalComponent implements OnChanges {
         id: `${produto.id}-${Date.now()}`,
         productId: produto.id,
         nome: produto.nome,
+        tamanho: produto.tamanho,
         quantidade,
         precoUnitario: produto.preco,
         subtotal: quantidade * produto.preco,
@@ -474,21 +978,28 @@ export class QuickComandaModalComponent implements OnChanges {
 
     if (!this.canEditComanda) {
       this.errorMessage = 'Esta comanda já foi finalizada e não pode mais ser alterada.';
+      this.activeStep = 'resumo';
+      return;
+    }
+
+    if (!this.validateCustomerStep()) {
+      return;
+    }
+
+    if (!this.validateItemsStep()) {
       return;
     }
 
     const selectedCliente = this.clientes.find((cliente) => cliente.id === this.selectedClienteId);
-    const clienteNome = this.clienteMode === 'manual' ? this.manualClienteNome.trim() : selectedCliente?.nome;
+    const clienteNome =
+      this.clienteMode === 'manual' ? this.manualClienteNome.trim() : selectedCliente?.nome;
 
     if (!clienteNome) {
-      this.errorMessage = this.clienteMode === 'manual'
-        ? 'Informe o nome do cliente não cadastrado.'
-        : 'Selecione um cliente para vincular à comanda.';
-      return;
-    }
-
-    if (this.items.length === 0) {
-      this.errorMessage = 'Adicione pelo menos um item à comanda.';
+      this.errorMessage =
+        this.clienteMode === 'manual'
+          ? 'Informe o nome do cliente não cadastrado.'
+          : 'Selecione um cliente para vincular à comanda.';
+      this.activeStep = 'cliente';
       return;
     }
 
@@ -520,6 +1031,10 @@ export class QuickComandaModalComponent implements OnChanges {
     return String(mesa.numero).padStart(2, '0');
   }
 
+  protected getProdutoTamanhoLabel(produto: Produto): string {
+    return this.produtosService.getTamanhoLabel(produto.tamanho);
+  }
+
   protected formatCurrency(valor: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -529,15 +1044,26 @@ export class QuickComandaModalComponent implements OnChanges {
 
   private initializeForm(): void {
     this.errorMessage = '';
-    this.productQuantities = this.activeProducts.reduce<Record<string, number>>((quantities, produto) => {
-      quantities[produto.id] = 1;
-      return quantities;
-    }, {});
+    this.activeStep = 'cliente';
+    this.productSearch = '';
+    this.productViewMode = 'lista';
+    this.productQuantities = this.activeProducts.reduce<Record<string, number>>(
+      (quantities, produto) => {
+        quantities[produto.id] = 1;
+        return quantities;
+      },
+      {},
+    );
 
     if (this.editingComanda) {
-      this.clienteMode = this.editingComanda.clienteManual || !this.editingComanda.clienteId ? 'manual' : 'cadastrado';
-      this.selectedClienteId = this.clienteMode === 'cadastrado' ? (this.editingComanda.clienteId ?? '') : '';
-      this.manualClienteNome = this.clienteMode === 'manual' ? (this.editingComanda.clienteNome ?? '') : '';
+      this.clienteMode =
+        this.editingComanda.clienteManual || !this.editingComanda.clienteId
+          ? 'manual'
+          : 'cadastrado';
+      this.selectedClienteId =
+        this.clienteMode === 'cadastrado' ? (this.editingComanda.clienteId ?? '') : '';
+      this.manualClienteNome =
+        this.clienteMode === 'manual' ? (this.editingComanda.clienteNome ?? '') : '';
       this.selectedMesaId = this.editingComanda.mesaId ?? '';
       this.items = this.editingComanda.itens.map((item) => ({ ...item }));
       return;
@@ -548,6 +1074,34 @@ export class QuickComandaModalComponent implements OnChanges {
     this.manualClienteNome = '';
     this.selectedMesaId = this.initialMesaId || '';
     this.items = [];
+  }
+
+  private validateCustomerStep(): boolean {
+    if (!this.canEditComanda) {
+      this.errorMessage = 'Esta comanda já foi finalizada e não pode mais ser alterada.';
+      return false;
+    }
+
+    if (this.hasValidCustomer) {
+      return true;
+    }
+
+    this.activeStep = 'cliente';
+    this.errorMessage =
+      this.clienteMode === 'manual'
+        ? 'Informe o nome do cliente não cadastrado para avançar.'
+        : 'Selecione um cliente cadastrado para avançar.';
+    return false;
+  }
+
+  private validateItemsStep(): boolean {
+    if (this.hasValidItems) {
+      return true;
+    }
+
+    this.activeStep = 'produtos';
+    this.errorMessage = 'Adicione pelo menos um item à comanda para avançar.';
+    return false;
   }
 
   private getSelectedMesa(): Mesa | undefined {

@@ -1,5 +1,6 @@
 export type ComandaStatus = 'aberta' | 'finalizada';
 export type ProductCategory = 'Lanches' | 'Bebidas' | 'Porções' | 'Sobremesas';
+export type ProdutoTamanho = 'mini' | 'muito_pequeno' | 'pequeno' | 'medio' | 'grande';
 export type MesaStatus = 'livre' | 'reservada' | 'inativa';
 export type MapaMesaStatus = 'livre' | 'ocupada' | 'reservada' | 'inativa';
 
@@ -84,6 +85,7 @@ export interface ItemPedido {
   id: string;
   productId: string;
   nome: string;
+  tamanho?: ProdutoTamanho;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;
@@ -176,6 +178,7 @@ export interface Produto {
   nome: string;
   descricao: string;
   categoria: ProductCategory;
+  tamanho: ProdutoTamanho;
   preco: number;
   ativo: boolean;
   createdAt: string;
@@ -186,6 +189,7 @@ export interface ItemComanda {
   id: string;
   productId: string;
   nome: string;
+  tamanho?: ProdutoTamanho;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;
@@ -222,6 +226,14 @@ export interface MapaMesaCard {
 }
 
 export const productCategories: ProductCategory[] = ['Lanches', 'Bebidas', 'Porções', 'Sobremesas'];
+
+export const produtoTamanhos: Array<{ id: ProdutoTamanho; label: string; ordem: number }> = [
+  { id: 'mini', label: 'Mini', ordem: 1 },
+  { id: 'muito_pequeno', label: 'Muito pequeno', ordem: 2 },
+  { id: 'pequeno', label: 'Pequeno', ordem: 3 },
+  { id: 'medio', label: 'Médio', ordem: 4 },
+  { id: 'grande', label: 'Grande', ordem: 5 },
+];
 
 export const telasSistema: TelaPermissaoConfig[] = [
   { tela: 'mapa', label: 'Dashboard / Mapa', path: '/mapa' },

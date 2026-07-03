@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { FiliaisService } from '../services/filiais.service';
 import { MenuOrderService, NavigationMenuItem } from '../services/menu-order.service';
 import { IconComponent } from './icon.component';
 
@@ -38,18 +39,18 @@ import { IconComponent } from './icon.component';
               @if (isExpanded(item.id)) {
                 <div class="sidebar-subnav">
                   @for (child of visibleChildren(item); track child.id) {
-                    @if (child.disabled) {
+                    @if (isNavigationDisabled(child)) {
                       <button
                         type="button"
                         class="sidebar-sub-link sidebar-link-disabled"
                         disabled
                         aria-disabled="true"
-                        [attr.title]="child.badge || 'Tela em construção'"
+                        [attr.title]="getNavigationBadge(child) || 'Item indisponível'"
                       >
                         <span class="sidebar-sub-dot" aria-hidden="true"></span>
                         <span class="sidebar-link-label">{{ child.label }}</span>
-                        @if (child.badge) {
-                          <span class="sidebar-link-badge">{{ child.badge }}</span>
+                        @if (getNavigationBadge(child)) {
+                          <span class="sidebar-link-badge">{{ getNavigationBadge(child) }}</span>
                         }
                       </button>
                     } @else {
@@ -67,20 +68,20 @@ import { IconComponent } from './icon.component';
                 </div>
               }
             </div>
-          } @else if (item.disabled) {
+          } @else if (isNavigationDisabled(item)) {
             <button
               type="button"
               class="sidebar-link sidebar-link-disabled"
               disabled
               aria-disabled="true"
-              [attr.title]="item.badge || 'Tela em construção'"
+              [attr.title]="getNavigationBadge(item) || 'Item indisponível'"
             >
               <span class="sidebar-link-icon">
                 <app-icon [name]="item.icon" [size]="24" />
               </span>
               <span class="sidebar-link-label">{{ item.label }}</span>
-              @if (item.badge) {
-                <span class="sidebar-link-badge">{{ item.badge }}</span>
+              @if (getNavigationBadge(item)) {
+                <span class="sidebar-link-badge">{{ getNavigationBadge(item) }}</span>
               }
             </button>
           } @else {
@@ -114,6 +115,7 @@ import { IconComponent } from './icon.component';
 export class SidebarComponent {
   protected readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly filiaisService = inject(FiliaisService);
   private readonly menuOrderService = inject(MenuOrderService);
   private readonly manuallyExpandedGroups = signal<Set<string>>(new Set());
 
@@ -124,7 +126,23 @@ export class SidebarComponent {
   );
 
   protected visibleChildren(item: NavigationMenuItem): NavigationMenuItem[] {
-    return (item.children ?? []).filter((child) => this.authService.canRead(child.tela));
+    return (item.children ?? []).filter((child) => this.authService.canRead(child.tela) || this.isFiliaisSetupChild(child));
+  }
+
+  protected isNavigationDisabled(item: NavigationMenuItem): boolean {
+    return Boolean(item.disabled) || this.isBlockedByFilialSetup(item);
+  }
+
+  protected getNavigationBadge(item: NavigationMenuItem): string | undefined {
+    if (item.disabled && item.badge) {
+      return item.badge;
+    }
+
+    if (this.isBlockedByFilialSetup(item)) {
+      return 'Filial obrigatória';
+    }
+
+    return item.badge;
   }
 
   protected toggleGroup(itemId: string): void {
@@ -145,6 +163,19 @@ export class SidebarComponent {
 
   protected hasActiveChild(item: NavigationMenuItem): boolean {
     return this.isRouteInsideGroup(item.id);
+  }
+
+
+  private isBlockedByFilialSetup(item: NavigationMenuItem): boolean {
+    if (this.filiaisService.hasFilialCadastrada()) {
+      return false;
+    }
+
+    return item.tela !== 'configuracoes';
+  }
+
+  private isFiliaisSetupChild(item: NavigationMenuItem): boolean {
+    return !this.filiaisService.hasFilialCadastrada() && item.id === 'configuracoes-filiais';
   }
 
   private isRouteInsideGroup(itemId: string): boolean {

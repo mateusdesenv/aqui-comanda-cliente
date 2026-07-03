@@ -12,12 +12,33 @@ export interface FilialPayload {
 
 @Injectable({ providedIn: 'root' })
 export class FiliaisService {
-  private readonly repository = new LocalStorageRepository<Filial[]>('aqui-comanda:filiais', []);
+  private readonly storageKey = 'aqui-comanda:filiais';
+  private readonly repository = new LocalStorageRepository<Filial[]>(this.storageKey, []);
 
   readonly filiais = signal<Filial[]>(this.normalizeFiliais(this.repository.read()));
 
   constructor() {
     this.persist();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event) => {
+        if (event.key === this.storageKey) {
+          this.reloadFromStorage();
+        }
+      });
+    }
+  }
+
+  reloadFromStorage(): void {
+    this.filiais.set(this.normalizeFiliais(this.repository.read()));
+  }
+
+  hasFilialCadastrada(): boolean {
+    return this.filiais().some((filial) => filial.ativa);
+  }
+
+  hasQualquerFilial(): boolean {
+    return this.filiais().length > 0;
   }
 
   getFiliais(): Filial[] {

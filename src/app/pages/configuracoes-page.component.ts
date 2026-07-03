@@ -72,6 +72,18 @@ export class ConfiguracoesPageComponent {
 
   protected readonly scaleOptions: ScaleOption[] = [
     {
+      value: 'mini',
+      label: 'Mini',
+      description: 'Escala mais compacta, ideal para máxima densidade de informação.',
+      preview: 'Mini',
+    },
+    {
+      value: 'tiny',
+      label: 'Muito pequeno',
+      description: 'Compacto sem perder legibilidade em telas operacionais.',
+      preview: 'Muito compacto',
+    },
+    {
       value: 'small',
       label: 'Pequeno',
       description: 'Mais compacto, ideal para telas menores e usuários acostumados com sistemas.',

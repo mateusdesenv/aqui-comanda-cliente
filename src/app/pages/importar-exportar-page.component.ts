@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { ConfirmationModalComponent } from '../components/confirmation-modal.component';
 import { AuthService } from '../services/auth.service';
+import { FiliaisService } from '../services/filiais.service';
 import { ImportExportModule, ImportExportService, ParsedImportFile } from '../services/import-export.service';
 
 interface PendingImport {
@@ -90,6 +91,7 @@ interface PendingImport {
 export class ImportarExportarPageComponent {
   private readonly importExportService = inject(ImportExportService);
   private readonly authService = inject(AuthService);
+  private readonly filiaisService = inject(FiliaisService);
 
   protected modules = this.importExportService.getModules();
   protected pendingImport: PendingImport | null = null;
@@ -168,6 +170,11 @@ export class ImportarExportarPageComponent {
     try {
       const moduleLabel = this.pendingImport.module.label;
       this.importExportService.importModule(this.pendingImport.module, this.pendingImport.parsedFile.data);
+
+      if (this.pendingImport.module.id === 'filiais') {
+        this.filiaisService.reloadFromStorage();
+      }
+
       this.modules = this.importExportService.getModules();
       this.pendingImport = null;
       this.successMessage = `${moduleLabel} importado com sucesso.`;

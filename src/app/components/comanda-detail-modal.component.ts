@@ -197,6 +197,7 @@ type MenuViewMode = 'grid' | 'lista';
                       <div>
                         <strong>{{ produto.nome }}</strong>
                         <p>{{ produto.descricao }}</p>
+                        <span class="product-size-chip quick-product-size">{{ getProdutoTamanhoLabel(produto) }}</span>
                       </div>
 
                       <span class="product-price">{{ formatCurrency(produto.preco) }}</span>
@@ -637,6 +638,7 @@ export class ComandaDetailModalComponent implements OnChanges {
         id: `${produto.id}-${Date.now()}`,
         productId: produto.id,
         nome: produto.nome,
+        tamanho: produto.tamanho,
         quantidade,
         precoUnitario: produto.preco,
         subtotal: quantidade * produto.preco,
@@ -812,6 +814,10 @@ export class ComandaDetailModalComponent implements OnChanges {
 
   protected getTotal(): number {
     return this.items.reduce((total, item) => total + item.subtotal, 0);
+  }
+
+  protected getProdutoTamanhoLabel(produto: Produto): string {
+    return this.produtosService.getTamanhoLabel(produto.tamanho);
   }
 
   protected formatCurrency(valor: number): string {
