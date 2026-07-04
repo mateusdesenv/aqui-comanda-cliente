@@ -19,6 +19,7 @@ type CategoryTab = ProductCategory | 'Todos';
 type ClienteComandaMode = 'cadastrado' | 'manual';
 type QuickComandaStep = 'cliente' | 'produtos' | 'resumo';
 type ProductViewMode = 'lista' | 'grid';
+type StockFilterMode = 'in_stock' | 'all';
 
 interface QuickComandaWorkflowTab {
   id: QuickComandaStep;
@@ -36,7 +37,7 @@ interface QuickComandaWorkflowTab {
         class="comanda-modal quick-comanda-modal quick-comanda-tabs-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="quick-comanda-modal-title"
+        [attr.aria-label]="modalTitle"
       >
         <button
           class="modal-close-button"
@@ -46,25 +47,6 @@ interface QuickComandaWorkflowTab {
         >
           X
         </button>
-
-        <header class="comanda-modal-header quick-tabs-modal-header">
-          <button class="modal-back-button" type="button" (click)="close.emit()">
-            ← Voltar ao mapa de comandas
-          </button>
-
-          <div class="modal-title-row">
-            <h2 id="quick-comanda-modal-title">{{ modalTitle }}</h2>
-            <span class="modal-status-badge free">{{ selectedMesaId ? 'MESA' : 'RÁPIDA' }}</span>
-          </div>
-
-          <p>
-            {{
-              isEditing
-                ? 'Edite a comanda em etapas: responsável, produtos e revisão final.'
-                : 'Crie a comanda em etapas: identifique o cliente, lance o consumo e confirme o resumo.'
-            }}
-          </p>
-        </header>
 
         <nav class="quick-workflow-tabs" aria-label="Etapas da criação de comanda">
           @for (tab of workflowTabs; track tab.id; let index = $index) {
@@ -301,6 +283,27 @@ interface QuickComandaWorkflowTab {
                 </div>
 
                 <div
+                  class="view-toggle stock-filter-toggle"
+                  role="group"
+                  aria-label="Filtro de estoque"
+                >
+                  <button
+                    type="button"
+                    [class.active]="stockFilterMode === 'in_stock'"
+                    (click)="setStockFilterMode('in_stock')"
+                  >
+                    Em estoque
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="stockFilterMode === 'all'"
+                    (click)="setStockFilterMode('all')"
+                  >
+                    Todos
+                  </button>
+                </div>
+
+                <div
                   class="view-toggle quick-product-view-toggle"
                   role="group"
                   aria-label="Visualização dos produtos"
@@ -338,11 +341,18 @@ interface QuickComandaWorkflowTab {
                       [class.product-grid-view]="productViewMode === 'grid'"
                     >
                       @for (produto of filteredProducts; track produto.id) {
-                        <article class="product-card" [class.selected]="isProductSelected(produto)">
+                        <article
+                          class="product-card"
+                          [class.selected]="isProductSelected(produto)"
+                          [class.product-card-disabled]="!canEditComanda || !hasProductStock(produto)"
+                        >
                           <div>
                             <strong>{{ produto.nome }}</strong>
                             <p>{{ produto.descricao }}</p>
                             <span class="product-size-chip quick-product-size">{{ getProdutoTamanhoLabel(produto) }}</span>
+                            <span class="stock-availability-chip" [class.out]="!hasProductStock(produto)">
+                              {{ getStockBadgeLabel(produto) }}
+                            </span>
                           </div>
 
                           <span class="product-price">{{ formatCurrency(produto.preco) }}</span>
@@ -364,7 +374,7 @@ interface QuickComandaWorkflowTab {
                               <button
                                 type="button"
                                 aria-label="Aumentar quantidade"
-                                [disabled]="!canEditComanda"
+                                [disabled]="!canEditComanda || !canIncreaseProduct(produto)"
                                 (click)="incrementQuantity(produto)"
                               >
                                 +
@@ -374,17 +384,17 @@ interface QuickComandaWorkflowTab {
                             <button
                               class="add-product-button"
                               type="button"
-                              [disabled]="!canEditComanda"
+                              [disabled]="!canEditComanda || !canAddProduct(produto)"
                               (click)="addItem(produto)"
                             >
-                              {{ isProductSelected(produto) ? 'Adicionar mais' : 'Adicionar' }}
+                              {{ getAddProductLabel(produto) }}
                             </button>
                           </div>
                         </article>
                       } @empty {
                         <div class="empty-menu-category quick-empty-products">
-                          <strong>Nenhum produto encontrado</strong>
-                          <span>Ajuste a busca ou selecione outra categoria.</span>
+                          <strong>{{ emptyProductsTitle }}</strong>
+                          <span>{{ emptyProductsDescription }}</span>
                         </div>
                       }
                     </div>
@@ -641,13 +651,13 @@ export class QuickComandaModalComponent implements OnChanges {
   protected activeCategory: CategoryTab = 'Todos';
   protected productSearch = '';
   protected productViewMode: ProductViewMode = 'lista';
+  protected stockFilterMode: StockFilterMode = 'in_stock';
   protected clienteMode: ClienteComandaMode = 'cadastrado';
   protected selectedClienteId = '';
   protected manualClienteNome = '';
   protected selectedMesaId = '';
   protected errorMessage = '';
   protected items: ItemComanda[] = [];
-  protected productQuantities: Record<string, number> = {};
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['editingComanda'] || changes['initialMesaId']) {
@@ -700,19 +710,28 @@ export class QuickComandaModalComponent implements OnChanges {
   }
 
   protected get filteredProducts(): Produto[] {
-    const searchTerm = this.productSearch.trim().toLowerCase();
+    return this.getFilteredProducts();
+  }
 
+  protected get emptyProductsTitle(): string {
+    return this.produtosService.normalizeText(this.productSearch)
+      ? 'Nenhum produto encontrado para essa busca'
+      : 'Nenhum produto encontrado';
+  }
+
+  protected get emptyProductsDescription(): string {
+    return 'Ajuste a busca, categoria ou filtro de estoque selecionado.';
+  }
+
+  private getFilteredProducts(): Produto[] {
     return this.activeProducts.filter((produto) => {
       const matchesCategory =
         this.activeCategory === 'Todos' || produto.categoria === this.activeCategory;
-      const matchesSearch =
-        !searchTerm ||
-        produto.nome.toLowerCase().includes(searchTerm) ||
-        produto.descricao.toLowerCase().includes(searchTerm) ||
-        produto.categoria.toLowerCase().includes(searchTerm) ||
-        this.getProdutoTamanhoLabel(produto).toLowerCase().includes(searchTerm);
+      const matchesSearch = this.produtosService.productMatchesSearch(produto, this.productSearch);
+      const matchesStockFilter =
+        this.stockFilterMode === 'all' || this.isProductAvailable(produto);
 
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesSearch && matchesStockFilter;
     });
   }
 
@@ -877,23 +896,35 @@ export class QuickComandaModalComponent implements OnChanges {
     this.productViewMode = viewMode;
   }
 
+  protected setStockFilterMode(mode: StockFilterMode): void {
+    this.stockFilterMode = mode;
+    this.errorMessage = '';
+  }
+
   protected isProductSelected(produto: Produto): boolean {
     return this.items.some((item) => item.productId === produto.id);
   }
 
   protected getQuantity(produto: Produto): number {
-    return this.productQuantities[produto.id] ?? 1;
+    return this.getSelectedQuantity(produto);
   }
 
   protected incrementQuantity(produto: Produto): void {
-    if (!this.canEditComanda) {
+    if (!this.canEditComanda || !this.canIncreaseProduct(produto)) {
+      if (this.canEditComanda) {
+        this.errorMessage = this.getStockErrorMessage(produto);
+      }
       return;
     }
 
-    this.productQuantities = {
-      ...this.productQuantities,
-      [produto.id]: this.getQuantity(produto) + 1,
-    };
+    const existingItem = this.items.find((item) => item.productId === produto.id);
+
+    if (existingItem) {
+      this.changeItemQuantity(existingItem, existingItem.quantidade + 1);
+      return;
+    }
+
+    this.addProductWithQuantity(produto, 1);
   }
 
   protected decrementQuantity(produto: Produto): void {
@@ -901,10 +932,13 @@ export class QuickComandaModalComponent implements OnChanges {
       return;
     }
 
-    this.productQuantities = {
-      ...this.productQuantities,
-      [produto.id]: Math.max(this.getQuantity(produto) - 1, 0),
-    };
+    const existingItem = this.items.find((item) => item.productId === produto.id);
+
+    if (!existingItem) {
+      return;
+    }
+
+    this.changeItemQuantity(existingItem, existingItem.quantidade - 1);
   }
 
   protected addItem(produto: Produto): void {
@@ -913,14 +947,23 @@ export class QuickComandaModalComponent implements OnChanges {
     }
 
     this.errorMessage = '';
-    const quantidade = Math.max(this.getQuantity(produto), 1);
-    const existingItem = this.items.find((item) => item.productId === produto.id);
 
-    if (existingItem) {
-      this.changeItemQuantity(existingItem, existingItem.quantidade + quantidade);
+    if (!this.canAddProduct(produto)) {
+      this.errorMessage = this.getStockErrorMessage(produto);
       return;
     }
 
+    const existingItem = this.items.find((item) => item.productId === produto.id);
+
+    if (existingItem) {
+      this.changeItemQuantity(existingItem, existingItem.quantidade + 1);
+      return;
+    }
+
+    this.addProductWithQuantity(produto, 1);
+  }
+
+  private addProductWithQuantity(produto: Produto, quantidade: number): void {
     this.items = [
       ...this.items,
       {
@@ -930,6 +973,8 @@ export class QuickComandaModalComponent implements OnChanges {
         tamanho: produto.tamanho,
         quantidade,
         precoUnitario: produto.preco,
+        unitCost: produto.costPrice,
+        totalCost: quantidade * produto.costPrice,
         subtotal: quantidade * produto.preco,
       },
     ];
@@ -945,11 +990,23 @@ export class QuickComandaModalComponent implements OnChanges {
       return;
     }
 
+    const produto = this.activeProducts.find((currentProduto) => currentProduto.id === itemToChange.productId);
+
+    if (
+      produto &&
+      this.produtosService.productControlsStock(produto) &&
+      nextQuantity > this.getProductTotalStock(produto)
+    ) {
+      this.errorMessage = 'Quantidade solicitada maior que o estoque disponível.';
+      return;
+    }
+
     this.items = this.items.map((item) =>
       item.id === itemToChange.id
         ? {
             ...item,
             quantidade: nextQuantity,
+            totalCost: nextQuantity * (item.unitCost ?? 0),
             subtotal: nextQuantity * item.precoUnitario,
           }
         : item,
@@ -1011,9 +1068,17 @@ export class QuickComandaModalComponent implements OnChanges {
       mesaId: this.selectedMesaId || undefined,
     };
 
-    const comanda = this.editingComanda
-      ? this.comandasService.updateComanda(this.editingComanda.id, payload)
-      : this.comandasService.createComanda(payload);
+    let comanda: Comanda | null = null;
+
+    try {
+      comanda = this.editingComanda
+        ? this.comandasService.updateComanda(this.editingComanda.id, payload)
+        : this.comandasService.createComanda(payload);
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : 'Produto sem estoque disponível.';
+      this.activeStep = 'produtos';
+      return;
+    }
 
     if (!comanda) {
       this.errorMessage = 'Não foi possível encontrar a comanda para edição.';
@@ -1025,6 +1090,106 @@ export class QuickComandaModalComponent implements OnChanges {
 
   protected getTotal(): number {
     return this.items.reduce((total, item) => total + item.subtotal, 0);
+  }
+
+  protected hasProductStock(produto: Produto): boolean {
+    return this.isProductAvailable(produto);
+  }
+
+  protected canIncreaseProduct(produto: Produto): boolean {
+    if (!this.isProductAvailable(produto)) {
+      return false;
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return true;
+    }
+
+    return this.getRemainingStock(produto) > 0;
+  }
+
+  protected canAddProduct(produto: Produto): boolean {
+    if (!this.isProductAvailable(produto)) {
+      return false;
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return true;
+    }
+
+    return this.getRemainingStock(produto) > 0;
+  }
+
+  protected getStockBadgeLabel(produto: Produto): string {
+    if (!this.produtosService.productControlsStock(produto)) {
+      return 'Disponível';
+    }
+
+    const totalStock = this.getProductTotalStock(produto);
+
+    if (totalStock <= 0) {
+      return 'Sem estoque';
+    }
+
+    return `Estoque: ${totalStock} · Selecionado: ${this.getSelectedQuantity(produto)} · Disponível: ${this.getRemainingStock(produto)}`;
+  }
+
+  protected getAddProductLabel(produto: Produto): string {
+    if (!this.isProductAvailable(produto)) {
+      return 'Sem estoque';
+    }
+
+    if (this.produtosService.productControlsStock(produto) && !this.canAddProduct(produto)) {
+      return 'Limite atingido';
+    }
+
+    return this.getSelectedQuantity(produto) > 0 ? 'Adicionar mais' : 'Adicionar';
+  }
+
+  private getStockErrorMessage(produto: Produto): string {
+    if (!produto.ativo) {
+      return 'Produto inativo.';
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return '';
+    }
+
+    return this.getProductTotalStock(produto) <= 0
+      ? 'Produto sem estoque disponível.'
+      : 'Quantidade solicitada maior que o estoque disponível.';
+  }
+
+  private getSelectedQuantity(produto: Produto): number {
+    return this.items.find((item) => item.productId === produto.id)?.quantidade ?? 0;
+  }
+
+  private getProductTotalStock(produto: Produto): number {
+    const selectedQuantity = this.getSelectedQuantity(produto);
+    return (Number(produto.stockQuantity) || 0) + (this.isEditing ? selectedQuantity : 0);
+  }
+
+  private getRemainingStock(produto: Produto): number {
+    if (!this.produtosService.productControlsStock(produto)) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    const selectedQuantity = this.getSelectedQuantity(produto);
+    const stockQuantity = Number(produto.stockQuantity) || 0;
+
+    return Math.max(0, this.isEditing ? stockQuantity : stockQuantity - selectedQuantity);
+  }
+
+  private isProductAvailable(produto: Produto): boolean {
+    if (!produto.ativo) {
+      return false;
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return true;
+    }
+
+    return this.getProductTotalStock(produto) > 0;
   }
 
   protected formatMesaNumber(mesa: Mesa): string {
@@ -1047,13 +1212,6 @@ export class QuickComandaModalComponent implements OnChanges {
     this.activeStep = 'cliente';
     this.productSearch = '';
     this.productViewMode = 'lista';
-    this.productQuantities = this.activeProducts.reduce<Record<string, number>>(
-      (quantities, produto) => {
-        quantities[produto.id] = 1;
-        return quantities;
-      },
-      {},
-    );
 
     if (this.editingComanda) {
       this.clienteMode =

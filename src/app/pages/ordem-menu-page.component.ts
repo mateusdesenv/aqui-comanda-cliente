@@ -21,7 +21,7 @@ import { MenuOrderService, NavigationMenuItem } from '../services/menu-order.ser
         <div class="settings-card-head">
           <div>
             <h2 id="menu-order-title">Itens principais do menu</h2>
-            <p>Organize os itens principais. Subitens, como os de Configurações, permanecem agrupados dentro do item pai.</p>
+            <p>Organize os itens principais. Subitens, como os de Estoque e Configurações, permanecem agrupados dentro do item pai.</p>
           </div>
           <span class="settings-current-badge">
             {{ canConfigureMenu() ? 'Editável' : 'Somente leitura' }}

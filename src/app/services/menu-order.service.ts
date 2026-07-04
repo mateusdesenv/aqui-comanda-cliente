@@ -16,6 +16,7 @@ export interface NavigationMenuItem {
 const MENU_ORDER_KEY = 'aqui-comanda:menu-order';
 
 export const defaultMenuItems: NavigationMenuItem[] = [
+  { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dollar', tela: 'dashboard' },
   { id: 'mapa', label: 'Mapa de Comandas', path: '/mapa', icon: 'commandMap', tela: 'mapa' },
   { id: 'comandas', label: 'Comandas', path: '/comandas', icon: 'receipt', tela: 'comandas', disabled: true, badge: 'Em breve' },
   { id: 'mesas', label: 'Mesas', path: '/mesas', icon: 'table', tela: 'mesas' },
@@ -24,6 +25,28 @@ export const defaultMenuItems: NavigationMenuItem[] = [
   { id: 'colaboradores', label: 'Colaboradores', path: '/colaboradores', icon: 'shield', tela: 'colaboradores' },
   { id: 'caixa', label: 'Caixa', path: '/caixa', icon: 'register', tela: 'caixa' },
   { id: 'cardapio', label: 'Cardápio', path: '/cardapio', icon: 'cards', tela: 'cardapio' },
+  {
+    id: 'estoque',
+    label: 'Estoque',
+    icon: 'register',
+    tela: 'estoque',
+    children: [
+      {
+        id: 'estoque-gestao',
+        label: 'Gestão de Estoque',
+        path: '/estoque/gestao',
+        icon: 'register',
+        tela: 'estoque',
+      },
+      {
+        id: 'estoque-entradas',
+        label: 'Entradas de estoque',
+        path: '/estoque/entradas',
+        icon: 'register',
+        tela: 'estoque',
+      },
+    ],
+  },
   { id: 'relatorios', label: 'Relatórios', path: '/relatorios', icon: 'file', tela: 'relatorios', disabled: true, badge: 'Em breve' },
   {
     id: 'configuracoes',

@@ -179,10 +179,14 @@ export class SidebarComponent {
   }
 
   private isRouteInsideGroup(itemId: string): boolean {
-    if (itemId !== 'configuracoes') {
+    const item = this.menuOrderService.getOrderedMenuItems().find((menuItem) => menuItem.id === itemId);
+
+    if (!item?.children?.length) {
       return false;
     }
 
-    return this.router.url.startsWith('/configuracoes');
+    const currentPath = this.router.url.split(/[?#]/)[0];
+
+    return item.children.some((child) => Boolean(child.path) && currentPath.startsWith(child.path!));
   }
 }

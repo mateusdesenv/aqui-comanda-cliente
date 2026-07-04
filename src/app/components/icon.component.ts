@@ -20,7 +20,8 @@ export type IconName =
   | 'mail'
   | 'lock'
   | 'eye'
-  | 'google';
+  | 'google'
+  | 'printer';
 
 @Component({
   selector: 'app-icon',
@@ -108,6 +109,11 @@ export type IconName =
           @case ('eye') {
             <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
             <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          }
+          @case ('printer') {
+            <path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v4a2 2 0 0 1-2 2h-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7 14h10v7H7v-7ZM9 17h6M9 19h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M17 11h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
           }
         }
       </svg>

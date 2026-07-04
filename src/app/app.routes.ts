@@ -6,6 +6,7 @@ import { ClientesPageComponent } from './pages/clientes-page.component';
 import { ColaboradoresPageComponent } from './pages/colaboradores-page.component';
 import { ConstructionPageComponent } from './pages/construction-page.component';
 import { ConfiguracoesPageComponent } from './pages/configuracoes-page.component';
+import { DashboardPageComponent } from './pages/dashboard-page.component';
 import { FiliaisPageComponent } from './pages/filiais-page.component';
 import { ImportarExportarPageComponent } from './pages/importar-exportar-page.component';
 import { OrdemMenuPageComponent } from './pages/ordem-menu-page.component';
@@ -13,6 +14,8 @@ import { LoginPageComponent } from './pages/login-page.component';
 import { MapaComandasPageComponent } from './pages/mapa-comandas-page.component';
 import { MesasPageComponent } from './pages/mesas-page.component';
 import { PedidosPageComponent } from './pages/pedidos-page.component';
+import { StockManagementPageComponent } from './pages/stock-management-page.component';
+import { StockEntriesPageComponent } from './pages/stock-entries-page.component';
 import { authGuard, permissionGuard } from './services/auth.guard';
 
 export const routes: Routes = [
@@ -22,7 +25,8 @@ export const routes: Routes = [
     component: AppLayoutComponent,
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'mapa' },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: 'dashboard', component: DashboardPageComponent, canActivate: [permissionGuard], data: { tela: 'dashboard' } },
       { path: 'mapa', component: MapaComandasPageComponent, canActivate: [permissionGuard], data: { tela: 'mapa' } },
       { path: 'comandas', component: ConstructionPageComponent, canActivate: [permissionGuard], data: { tela: 'comandas', title: 'Comandas' } },
       { path: 'mesas', component: MesasPageComponent, canActivate: [permissionGuard], data: { tela: 'mesas' } },
@@ -31,6 +35,8 @@ export const routes: Routes = [
       { path: 'colaboradores', component: ColaboradoresPageComponent, canActivate: [permissionGuard], data: { tela: 'colaboradores' } },
       { path: 'caixa', component: CaixaPageComponent, canActivate: [permissionGuard], data: { tela: 'caixa' } },
       { path: 'cardapio', component: CardapioPageComponent, canActivate: [permissionGuard], data: { tela: 'cardapio' } },
+      { path: 'estoque/gestao', component: StockManagementPageComponent, canActivate: [permissionGuard], data: { tela: 'estoque' } },
+      { path: 'estoque/entradas', component: StockEntriesPageComponent, canActivate: [permissionGuard], data: { tela: 'estoque' } },
       { path: 'relatorios', component: ConstructionPageComponent, canActivate: [permissionGuard], data: { tela: 'relatorios', title: 'Relatórios' } },
       { path: 'configuracoes', pathMatch: 'full', redirectTo: 'configuracoes/personalizacoes' },
       { path: 'configuracoes/personalizacoes', component: ConfiguracoesPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
