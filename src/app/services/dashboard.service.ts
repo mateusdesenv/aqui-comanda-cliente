@@ -1,8 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { Comanda, ItemComanda, ItemPedido, Pedido } from '../models/app-data';
+import { Comanda, ItemComanda, ItemPedido, Pedido, Produto } from '../models/app-data';
 import { ComandasService } from './comandas.service';
 import { PedidosService } from './pedidos.service';
 import { ProdutosService } from './produtos.service';
+import { StockEntriesService } from './stock-entries.service';
 
 export type DashboardPeriodPreset = 'today' | 'yesterday' | 'last_7' | 'last_30' | 'custom';
 
@@ -17,6 +18,35 @@ export interface DashboardChartItem {
   value: number;
 }
 
+export interface DashboardProductMetric {
+  productId: string;
+  productName: string;
+  quantitySold: number;
+  salesTotal: number;
+  cmvTotal: number;
+  grossProfit: number;
+  grossMarginPercent: number;
+}
+
+export interface DashboardCategoryMetric {
+  categoryId: string;
+  categoryName: string;
+  salesTotal: number;
+  cmvTotal: number;
+  grossProfit: number;
+  grossMarginPercent: number;
+}
+
+export type DashboardStockStatus = 'LOW' | 'OUT_OF_STOCK' | 'OK';
+
+export interface DashboardCriticalStockItem {
+  productId: string;
+  productName: string;
+  currentStock: number;
+  minimumStock: number;
+  status: DashboardStockStatus;
+}
+
 export interface DashboardSummary {
   salesTotal: number;
   cmvTotal: number;
@@ -25,8 +55,12 @@ export interface DashboardSummary {
   averageTicket: number;
   closedOrdersCount: number;
   openCommandsCount: number;
-  cmvChart: DashboardChartItem[];
-  salesChart: DashboardChartItem[];
+  salesByPeriod: DashboardChartItem[];
+  financialComparison: DashboardChartItem[];
+  topProductsByProfit: DashboardProductMetric[];
+  topProductsByQuantity: DashboardProductMetric[];
+  salesByCategory: DashboardCategoryMetric[];
+  criticalStock: DashboardCriticalStockItem[];
 }
 
 interface DashboardSale {
@@ -34,6 +68,16 @@ interface DashboardSale {
   closedAt: string;
   total: number;
   cmv: number;
+  items: DashboardSaleItem[];
+}
+
+interface DashboardSaleItem {
+  productId: string;
+  productName: string;
+  categoryName: string;
+  quantity: number;
+  salesTotal: number;
+  cmvTotal: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -41,6 +85,7 @@ export class DashboardService {
   private readonly comandasService = inject(ComandasService);
   private readonly pedidosService = inject(PedidosService);
   private readonly produtosService = inject(ProdutosService);
+  private readonly stockEntriesService = inject(StockEntriesService);
 
   getSummary(period: DashboardPeriod): DashboardSummary {
     const sales = this.getSalesInPeriod(period);
@@ -59,12 +104,16 @@ export class DashboardService {
       averageTicket,
       closedOrdersCount,
       openCommandsCount: this.comandasService.getOpenComandas().length,
-      cmvChart: [
+      salesByPeriod: this.buildSalesChart(sales, period),
+      financialComparison: [
         { label: 'Faturamento', value: salesTotal },
         { label: 'CMV', value: cmvTotal },
         { label: 'Lucro bruto', value: grossProfit },
       ],
-      salesChart: this.buildSalesChart(sales, period),
+      topProductsByProfit: this.buildTopProductsByProfit(sales),
+      topProductsByQuantity: this.buildTopProductsByQuantity(sales),
+      salesByCategory: this.buildSalesByCategory(sales),
+      criticalStock: this.buildCriticalStock(),
     };
   }
 
@@ -122,6 +171,7 @@ export class DashboardService {
         closedAt: comanda.finalizadaEm!,
         total: Number(comanda.totalFinalizado ?? comanda.total) || 0,
         cmv: this.getComandaCmv(comanda),
+        items: (comanda.itens ?? []).map((item) => this.createSaleItemFromComanda(item)),
       }));
   }
 
@@ -134,6 +184,7 @@ export class DashboardService {
         closedAt: pedido.updatedAt || pedido.createdAt,
         total: Number(pedido.total) || 0,
         cmv: this.getPedidoCmv(pedido),
+        items: (pedido.itens ?? []).map((item) => this.createSaleItemFromPedido(item)),
       }));
   }
 
@@ -173,7 +224,61 @@ export class DashboardService {
 
   private getCurrentProductCost(productId: string): number {
     const produto = this.produtosService.getProdutoById(productId);
-    return Number(produto?.costPrice) || 0;
+    const productCost = Number(produto?.costPrice) || 0;
+
+    if (productCost > 0) {
+      return productCost;
+    }
+
+    return this.getAverageCostFromStockEntries(productId);
+  }
+
+  private createSaleItemFromComanda(item: ItemComanda): DashboardSaleItem {
+    const produto = this.produtosService.getProdutoById(item.productId);
+    const quantity = Number(item.quantidade) || 0;
+    const salesTotal = Number(item.subtotal) || quantity * (Number(item.precoUnitario) || 0);
+
+    return {
+      productId: item.productId,
+      productName: item.nome || produto?.nome || 'Produto não identificado',
+      categoryName: produto?.categoria ?? 'Sem categoria',
+      quantity,
+      salesTotal,
+      cmvTotal: this.getItemComandaCost(item),
+    };
+  }
+
+  private createSaleItemFromPedido(item: ItemPedido): DashboardSaleItem {
+    const produto = this.produtosService.getProdutoById(item.productId);
+    const quantity = Number(item.quantidade) || 0;
+    const salesTotal = Number(item.subtotal) || quantity * (Number(item.precoUnitario) || 0);
+
+    return {
+      productId: item.productId,
+      productName: item.nome || produto?.nome || 'Produto não identificado',
+      categoryName: produto?.categoria ?? 'Sem categoria',
+      quantity,
+      salesTotal,
+      cmvTotal: this.getItemPedidoCost(item),
+    };
+  }
+
+  private getAverageCostFromStockEntries(productId: string): number {
+    let totalCost = 0;
+    let totalQuantity = 0;
+
+    for (const entry of this.stockEntriesService.getStockEntries()) {
+      for (const item of entry.items ?? []) {
+        if (item.productId !== productId) {
+          continue;
+        }
+
+        totalCost += Number(item.totalCost) || (Number(item.quantity) || 0) * (Number(item.unitCost) || 0);
+        totalQuantity += Number(item.quantity) || 0;
+      }
+    }
+
+    return totalQuantity > 0 ? totalCost / totalQuantity : 0;
   }
 
   private buildSalesChart(sales: DashboardSale[], period: DashboardPeriod): DashboardChartItem[] {
@@ -192,6 +297,133 @@ export class DashboardService {
       label,
       value: this.roundCurrency(value),
     }));
+  }
+
+  private buildTopProductsByProfit(sales: DashboardSale[]): DashboardProductMetric[] {
+    return this.buildProductMetrics(sales)
+      .sort((first, second) => second.grossProfit - first.grossProfit)
+      .slice(0, 5);
+  }
+
+  private buildTopProductsByQuantity(sales: DashboardSale[]): DashboardProductMetric[] {
+    return this.buildProductMetrics(sales)
+      .sort((first, second) => second.quantitySold - first.quantitySold)
+      .slice(0, 5);
+  }
+
+  private buildProductMetrics(sales: DashboardSale[]): DashboardProductMetric[] {
+    const grouped = new Map<string, DashboardProductMetric>();
+
+    for (const item of sales.flatMap((sale) => sale.items)) {
+      const current =
+        grouped.get(item.productId) ??
+        {
+          productId: item.productId,
+          productName: item.productName,
+          quantitySold: 0,
+          salesTotal: 0,
+          cmvTotal: 0,
+          grossProfit: 0,
+          grossMarginPercent: 0,
+        };
+
+      current.quantitySold += item.quantity;
+      current.salesTotal += item.salesTotal;
+      current.cmvTotal += item.cmvTotal;
+      current.grossProfit = current.salesTotal - current.cmvTotal;
+      current.grossMarginPercent =
+        current.salesTotal > 0 ? (current.grossProfit / current.salesTotal) * 100 : 0;
+
+      grouped.set(item.productId, current);
+    }
+
+    return Array.from(grouped.values()).map((item) => this.roundProductMetric(item));
+  }
+
+  private buildSalesByCategory(sales: DashboardSale[]): DashboardCategoryMetric[] {
+    const grouped = new Map<string, DashboardCategoryMetric>();
+
+    for (const item of sales.flatMap((sale) => sale.items)) {
+      const categoryName = item.categoryName || 'Sem categoria';
+      const current =
+        grouped.get(categoryName) ??
+        {
+          categoryId: categoryName,
+          categoryName,
+          salesTotal: 0,
+          cmvTotal: 0,
+          grossProfit: 0,
+          grossMarginPercent: 0,
+        };
+
+      current.salesTotal += item.salesTotal;
+      current.cmvTotal += item.cmvTotal;
+      current.grossProfit = current.salesTotal - current.cmvTotal;
+      current.grossMarginPercent =
+        current.salesTotal > 0 ? (current.grossProfit / current.salesTotal) * 100 : 0;
+
+      grouped.set(categoryName, current);
+    }
+
+    return Array.from(grouped.values())
+      .map((item) => ({
+        ...item,
+        salesTotal: this.roundCurrency(item.salesTotal),
+        cmvTotal: this.roundCurrency(item.cmvTotal),
+        grossProfit: this.roundCurrency(item.grossProfit),
+        grossMarginPercent: this.roundCurrency(item.grossMarginPercent),
+      }))
+      .sort((first, second) => second.salesTotal - first.salesTotal);
+  }
+
+  private buildCriticalStock(): DashboardCriticalStockItem[] {
+    return this.produtosService
+      .getProdutos()
+      .filter((produto) => produto.ativo && this.produtosService.productControlsStock(produto))
+      .map((produto) => this.getCriticalStockItem(produto))
+      .filter((item) => item.status !== 'OK')
+      .sort((first, second) => {
+        const statusWeight: Record<DashboardStockStatus, number> = {
+          OUT_OF_STOCK: 0,
+          LOW: 1,
+          OK: 2,
+        };
+
+        return (
+          statusWeight[first.status] - statusWeight[second.status] ||
+          first.currentStock - second.currentStock ||
+          first.productName.localeCompare(second.productName, 'pt-BR')
+        );
+      })
+      .slice(0, 8);
+  }
+
+  private getCriticalStockItem(produto: Produto): DashboardCriticalStockItem {
+    const extraFields = produto as Produto & { minimumStock?: unknown; estoqueMinimo?: unknown; minStock?: unknown };
+    const currentStock = Number(produto.stockQuantity) || 0;
+    const minimumStock =
+      Number(extraFields.minimumStock ?? extraFields.estoqueMinimo ?? extraFields.minStock) || 5;
+    const status: DashboardStockStatus =
+      currentStock <= 0 ? 'OUT_OF_STOCK' : currentStock <= minimumStock ? 'LOW' : 'OK';
+
+    return {
+      productId: produto.id,
+      productName: produto.nome,
+      currentStock: this.roundCurrency(currentStock),
+      minimumStock,
+      status,
+    };
+  }
+
+  private roundProductMetric(metric: DashboardProductMetric): DashboardProductMetric {
+    return {
+      ...metric,
+      quantitySold: this.roundCurrency(metric.quantitySold),
+      salesTotal: this.roundCurrency(metric.salesTotal),
+      cmvTotal: this.roundCurrency(metric.cmvTotal),
+      grossProfit: this.roundCurrency(metric.grossProfit),
+      grossMarginPercent: this.roundCurrency(metric.grossMarginPercent),
+    };
   }
 
   private getDaysBetween(startDate: string, endDate: string): number {

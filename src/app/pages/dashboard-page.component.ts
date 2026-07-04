@@ -3,8 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { StatCardComponent } from '../components/stat-card.component';
 import {
   DashboardChartItem,
+  DashboardCriticalStockItem,
   DashboardPeriod,
   DashboardPeriodPreset,
+  DashboardProductMetric,
   DashboardService,
   DashboardSummary,
 } from '../services/dashboard.service';
@@ -73,19 +75,19 @@ import {
           <article class="dashboard-chart-panel">
             <header>
               <div>
-                <h2>Vendas do período</h2>
+                <h2>Vendas por período</h2>
                 <span>{{ salesGroupingLabel }}</span>
               </div>
               <strong>{{ formatCurrency(summary.salesTotal) }}</strong>
             </header>
 
-            @if (summary.salesChart.length > 0) {
+            @if (summary.salesByPeriod.length > 0) {
               <div class="dashboard-bars sales-bars">
-                @for (item of summary.salesChart; track item.label) {
+                @for (item of summary.salesByPeriod; track item.label) {
                   <div class="dashboard-bar-row">
                     <span>{{ item.label }}</span>
                     <div class="dashboard-bar-track">
-                      <i [style.width.%]="getBarWidth(item.value, summary.salesChart)"></i>
+                      <i [style.width.%]="getBarWidth(item.value, summary.salesByPeriod)"></i>
                     </div>
                     <strong>{{ formatCurrency(item.value) }}</strong>
                   </div>
@@ -102,23 +104,139 @@ import {
           <article class="dashboard-chart-panel">
             <header>
               <div>
-                <h2>CMV e lucro bruto</h2>
-                <span>Relação entre faturamento, custo e sobra operacional</span>
+                <h2>Faturamento x CMV x lucro bruto</h2>
+                <span>Compare quanto vendeu, quanto custou e quanto sobrou</span>
               </div>
               <strong>{{ formatPercent(summary.grossMarginPercent) }}</strong>
             </header>
 
             <div class="dashboard-column-chart">
-              @for (item of summary.cmvChart; track item.label) {
+              @for (item of summary.financialComparison; track item.label) {
                 <div>
                   <div class="dashboard-column-track">
-                    <i [style.height.%]="getBarWidth(item.value, summary.cmvChart)" [class.cost]="item.label === 'CMV'" [class.profit]="item.label === 'Lucro bruto'"></i>
+                    <i [style.height.%]="getBarWidth(item.value, summary.financialComparison)" [class.cost]="item.label === 'CMV'" [class.profit]="item.label === 'Lucro bruto'"></i>
                   </div>
                   <strong>{{ item.label }}</strong>
                   <span>{{ formatCurrency(item.value) }}</span>
                 </div>
               }
             </div>
+          </article>
+
+          <article class="dashboard-chart-panel">
+            <header>
+              <div>
+                <h2>Top 5 por lucro bruto</h2>
+                <span>Produtos que mais colocam dinheiro no caixa</span>
+              </div>
+            </header>
+
+            @if (summary.topProductsByProfit.length > 0) {
+              <div class="dashboard-bars dashboard-ranking-bars">
+                @for (item of summary.topProductsByProfit; track item.productId) {
+                  <div class="dashboard-bar-row">
+                    <span>{{ item.productName }}</span>
+                    <div class="dashboard-bar-track profit">
+                      <i [style.width.%]="getProductMetricWidth(item.grossProfit, summary.topProductsByProfit, 'grossProfit')"></i>
+                    </div>
+                    <strong>{{ formatCurrency(item.grossProfit) }}</strong>
+                    <small>{{ formatQuantity(item.quantitySold) }} vendidos · margem {{ formatPercent(item.grossMarginPercent) }}</small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="dashboard-empty-chart">
+                <strong>Nenhum produto vendido no período</strong>
+                <span>Finalize vendas para acompanhar os produtos mais lucrativos.</span>
+              </div>
+            }
+          </article>
+
+          <article class="dashboard-chart-panel">
+            <header>
+              <div>
+                <h2>Top 5 por quantidade vendida</h2>
+                <span>Produtos com maior giro operacional</span>
+              </div>
+            </header>
+
+            @if (summary.topProductsByQuantity.length > 0) {
+              <div class="dashboard-bars dashboard-ranking-bars">
+                @for (item of summary.topProductsByQuantity; track item.productId) {
+                  <div class="dashboard-bar-row">
+                    <span>{{ item.productName }}</span>
+                    <div class="dashboard-bar-track">
+                      <i [style.width.%]="getProductMetricWidth(item.quantitySold, summary.topProductsByQuantity, 'quantitySold')"></i>
+                    </div>
+                    <strong>{{ formatQuantity(item.quantitySold) }}</strong>
+                    <small>{{ formatCurrency(item.salesTotal) }} vendidos · lucro {{ formatCurrency(item.grossProfit) }}</small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="dashboard-empty-chart">
+                <strong>Nenhum produto vendido no período</strong>
+                <span>O ranking de giro aparece quando houver vendas concluídas.</span>
+              </div>
+            }
+          </article>
+
+          <article class="dashboard-chart-panel">
+            <header>
+              <div>
+                <h2>Vendas por categoria</h2>
+                <span>Categorias que mais puxam o faturamento</span>
+              </div>
+            </header>
+
+            @if (summary.salesByCategory.length > 0) {
+              <div class="dashboard-bars dashboard-ranking-bars">
+                @for (item of summary.salesByCategory; track item.categoryId) {
+                  <div class="dashboard-bar-row">
+                    <span>{{ item.categoryName }}</span>
+                    <div class="dashboard-bar-track category">
+                      <i [style.width.%]="getCategoryWidth(item.salesTotal)"></i>
+                    </div>
+                    <strong>{{ formatCurrency(item.salesTotal) }}</strong>
+                    <small>Lucro {{ formatCurrency(item.grossProfit) }} · margem {{ formatPercent(item.grossMarginPercent) }}</small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="dashboard-empty-chart">
+                <strong>Nenhuma categoria com venda</strong>
+                <span>As categorias aparecem quando houver produtos vendidos no período.</span>
+              </div>
+            }
+          </article>
+
+          <article class="dashboard-chart-panel">
+            <header>
+              <div>
+                <h2>Estoque crítico</h2>
+                <span>Produtos que podem prejudicar as próximas vendas</span>
+              </div>
+              <strong>{{ summary.criticalStock.length }}</strong>
+            </header>
+
+            @if (summary.criticalStock.length > 0) {
+              <div class="dashboard-critical-list">
+                @for (item of summary.criticalStock; track item.productId) {
+                  <div class="dashboard-critical-item" [class.out]="item.status === 'OUT_OF_STOCK'">
+                    <div>
+                      <strong>{{ item.productName }}</strong>
+                      <span>{{ getStockStatusLabel(item) }}</span>
+                    </div>
+                    <em>{{ formatQuantity(item.currentStock) }} / mín. {{ formatQuantity(item.minimumStock) }}</em>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="dashboard-empty-chart">
+                <strong>Nenhum produto com estoque crítico</strong>
+                <span>Produtos com estoque zerado ou baixo aparecerão aqui.</span>
+              </div>
+            }
           </article>
         </section>
       }
@@ -184,6 +302,34 @@ export class DashboardPageComponent {
     return Math.max(6, Math.round((value / maxValue) * 100));
   }
 
+  protected getProductMetricWidth(
+    value: number,
+    items: DashboardProductMetric[],
+    key: 'grossProfit' | 'quantitySold',
+  ): number {
+    const maxValue = Math.max(...items.map((item) => item[key]), 0);
+
+    if (maxValue <= 0) {
+      return 0;
+    }
+
+    return Math.max(6, Math.round((value / maxValue) * 100));
+  }
+
+  protected getCategoryWidth(value: number): number {
+    const maxValue = Math.max(...this.summary.salesByCategory.map((item) => item.salesTotal), 0);
+
+    if (maxValue <= 0) {
+      return 0;
+    }
+
+    return Math.max(6, Math.round((value / maxValue) * 100));
+  }
+
+  protected getStockStatusLabel(item: DashboardCriticalStockItem): string {
+    return item.status === 'OUT_OF_STOCK' ? 'Sem estoque' : 'Estoque baixo';
+  }
+
   protected formatCurrency(value: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -196,6 +342,12 @@ export class DashboardPageComponent {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     }).format(value)}%`;
+  }
+
+  protected formatQuantity(value: number): string {
+    return new Intl.NumberFormat('pt-BR', {
+      maximumFractionDigits: 2,
+    }).format(value);
   }
 
   private isSingleDayPeriod(): boolean {
