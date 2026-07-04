@@ -127,7 +127,7 @@ type CaixaViewMode = 'lista' | 'grid';
         </button>
       </section>
 
-      <section class="stats-grid" aria-label="Resumo do caixa">
+      <section class="stats-grid summary-cards-scroll" aria-label="Resumo do caixa">
         <app-stat-card icon="dollar" label="Total recebido" [value]="formatCurrency(totalRecebido)" helper="Entradas filtradas" variant="dark" />
         <app-stat-card icon="register" label="Entradas registradas" [value]="filteredEntradas.length" helper="Movimentos financeiros" variant="green" />
         <app-stat-card icon="check" label="Recebido hoje" [value]="formatCurrency(totalRecebidoHoje)" helper="Entradas da data atual" variant="amber" />

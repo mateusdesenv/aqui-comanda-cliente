@@ -46,7 +46,7 @@ import { AuthService } from '../services/auth.service';
         <section class="map-feedback">{{ feedbackMessage }}</section>
       }
 
-      <section class="stats-grid" aria-label="Resumo das mesas">
+      <section class="stats-grid summary-cards-scroll" aria-label="Resumo das mesas">
         <app-stat-card icon="check" label="Livres" [value]="resumo.livres" [helper]="getLivreHelper()" variant="green" />
         <app-stat-card icon="users" label="Ocupadas" [value]="resumo.ocupadas" [helper]="getOcupadaHelper()" variant="amber" />
         <app-stat-card icon="dollar" label="Total em consumo" [value]="formatCurrency(resumo.totalEmConsumo)" helper="Valor total nas ocupadas" variant="dark" />

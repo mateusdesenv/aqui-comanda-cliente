@@ -66,7 +66,7 @@ import {
           <span>{{ errorMessage }}</span>
         </section>
       } @else {
-        <section class="stats-grid dashboard-stats" aria-label="Indicadores do dashboard">
+        <section class="stats-grid summary-cards-scroll dashboard-stats" aria-label="Indicadores do dashboard">
           @for (card of kpiCards; track card.label) {
             <article class="dashboard-kpi-card {{ card.variant }}">
               <span class="dashboard-kpi-icon">

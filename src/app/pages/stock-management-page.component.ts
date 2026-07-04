@@ -23,7 +23,7 @@ type StockStatusFilter = 'todos' | 'com_estoque' | 'sem_estoque' | 'baixo';
         </a>
       </section>
 
-      <section class="stats-grid" aria-label="Resumo do estoque">
+      <section class="stats-grid summary-cards-scroll" aria-label="Resumo do estoque">
         <article class="stat-card neutral">
           <span class="stat-icon">#</span>
           <div>

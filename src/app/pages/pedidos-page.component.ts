@@ -65,7 +65,7 @@ interface PedidoFormModel {
         <section class="map-feedback">{{ feedbackMessage }}</section>
       }
 
-      <section class="stats-grid" aria-label="Resumo dos pedidos">
+      <section class="stats-grid summary-cards-scroll" aria-label="Resumo dos pedidos">
         <app-stat-card icon="receipt" label="Abertos" [value]="totalByStatus('aberto')" helper="Pedidos aguardando preparo" variant="green" />
         <app-stat-card icon="cards" label="Em preparo" [value]="totalByStatus('em_preparo')" helper="Pedidos na cozinha" variant="amber" />
         <app-stat-card icon="bell" label="Em entrega" [value]="totalByStatus('saiu_entrega')" helper="Pedidos a caminho" variant="neutral" />
