@@ -6,7 +6,7 @@ import { IconComponent, IconName } from './icon.component';
   standalone: true,
   imports: [IconComponent],
   template: `
-    <article class="stat-card">
+    <article class="stat-card liquid-glass-card liquid-glass-hover">
       <span class="stat-icon {{ variant }}">
         <app-icon [name]="icon" [size]="28" />
       </span>

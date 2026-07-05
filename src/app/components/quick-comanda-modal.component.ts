@@ -34,7 +34,7 @@ interface QuickComandaWorkflowTab {
   template: `
     <div class="comanda-modal-overlay quick-comanda-fullscreen-overlay" role="presentation">
       <section
-        class="comanda-modal quick-comanda-modal quick-comanda-tabs-modal"
+        class="comanda-modal quick-comanda-modal quick-comanda-tabs-modal liquid-glass-modal"
         role="dialog"
         aria-modal="true"
         [attr.aria-label]="modalTitle"

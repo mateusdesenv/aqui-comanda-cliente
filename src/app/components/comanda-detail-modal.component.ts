@@ -19,7 +19,7 @@ type StockFilterMode = 'in_stock' | 'all';
   template: `
     <div class="comanda-modal-overlay" role="presentation">
       <section
-        class="comanda-modal mesa-detail-modal"
+        class="comanda-modal mesa-detail-modal liquid-glass-modal"
         role="dialog"
         aria-modal="true"
         [attr.aria-labelledby]="'comanda-modal-title-' + mesa.id"

@@ -8239,3 +8239,406 @@ select:disabled,
     width: 100%;
   }
 }
+
+/* Liquid Glass premium */
+:root {
+  --glass-surface: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.86),
+    rgba(255, 255, 255, 0.64) 52%,
+    rgba(241, 247, 243, 0.72)
+  );
+  --glass-surface-soft: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.82),
+    rgba(255, 255, 255, 0.58)
+  );
+  --glass-surface-dark: linear-gradient(
+    145deg,
+    rgba(18, 32, 25, 0.88),
+    rgba(27, 50, 39, 0.74)
+  );
+  --glass-border: rgba(255, 255, 255, 0.62);
+  --glass-border-soft: rgba(214, 214, 211, 0.72);
+  --glass-shadow: 0 24px 60px rgba(18, 32, 25, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  --glass-shadow-deep: 0 36px 100px rgba(18, 32, 25, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  --glass-card-shadow: 0 18px 42px rgba(18, 32, 25, 0.095), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  --glass-card-shadow-hover: 0 24px 58px rgba(18, 32, 25, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.liquid-glass,
+.liquid-glass-card,
+.liquid-glass-modal {
+  position: relative;
+  isolation: isolate;
+  border-color: var(--glass-border-soft);
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+
+.liquid-glass-card,
+.stat-card,
+.dashboard-kpi-card,
+.dashboard-chart-panel,
+.dashboard-state-card,
+.settings-card,
+.management-form-card,
+.management-list-card,
+.detail-panel,
+.product-card,
+.quick-ident-card,
+.quick-summary-card,
+.order-context-card,
+.order-total-panel,
+.mesa-comanda-card,
+.mesa-add-comanda-card,
+.mesa-readonly-empty-card,
+.quick-comanda-card,
+.pedido-card,
+.pedido-form-card,
+.pedido-details-card,
+.caixa-session-card,
+.caixa-entry-card,
+.branch-card,
+.import-export-card,
+.scale-option-card,
+.confirmation-card {
+  background: var(--glass-surface-soft);
+  border-color: var(--glass-border-soft);
+  box-shadow: var(--glass-card-shadow);
+  backdrop-filter: blur(12px) saturate(125%);
+  -webkit-backdrop-filter: blur(12px) saturate(125%);
+}
+
+.liquid-glass-modal,
+.comanda-modal,
+.management-modal-card,
+.system-confirmation-modal,
+.confirmation-dialog {
+  overflow: auto;
+  border-color: var(--glass-border);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(195, 124, 34, 0.16), transparent 25%),
+    radial-gradient(circle at 4% 100%, rgba(47, 83, 65, 0.12), transparent 30%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(250, 248, 245, 0.74) 48%, rgba(241, 247, 243, 0.82));
+  box-shadow: var(--glass-shadow-deep);
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+}
+
+.liquid-glass::before,
+.liquid-glass-modal::before,
+.comanda-modal::before,
+.management-modal-card::before,
+.system-confirmation-modal::before,
+.confirmation-dialog::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 30%),
+    linear-gradient(110deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 42%);
+}
+
+.comanda-modal-overlay {
+  background:
+    radial-gradient(circle at 20% 18%, rgba(195, 124, 34, 0.16), transparent 28%),
+    rgba(18, 32, 25, 0.62);
+  backdrop-filter: blur(10px) saturate(118%);
+  -webkit-backdrop-filter: blur(10px) saturate(118%);
+}
+
+.liquid-glass-hover,
+.stat-card,
+.dashboard-kpi-card,
+.dashboard-chart-panel,
+.settings-card,
+.management-form-card,
+.management-list-card,
+.product-card,
+.quick-ident-card,
+.quick-summary-card,
+.mesa-comanda-card,
+.mesa-add-comanda-card,
+.quick-comanda-card,
+.pedido-card,
+.caixa-entry-card,
+.branch-card,
+.import-export-card,
+.scale-option-card {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .liquid-glass-hover:hover,
+  .stat-card:hover,
+  .dashboard-kpi-card:hover,
+  .dashboard-chart-panel:hover,
+  .settings-card:hover,
+  .management-form-card:hover,
+  .management-list-card:hover,
+  .product-card:hover,
+  .quick-ident-card:hover,
+  .quick-summary-card:hover,
+  .mesa-comanda-card:hover,
+  .mesa-add-comanda-card:hover,
+  .quick-comanda-card:hover,
+  .pedido-card:hover,
+  .caixa-entry-card:hover,
+  .branch-card:hover,
+  .import-export-card:hover,
+  .scale-option-card:hover {
+    border-color: rgba(195, 124, 34, 0.38);
+    box-shadow: var(--glass-card-shadow-hover);
+    transform: translateY(-3px);
+  }
+
+  .management-form-card:hover,
+  .management-list-card:hover,
+  .settings-card:hover,
+  .dashboard-chart-panel:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.comanda-card.free,
+.comanda-card.reserved,
+.comanda-card.occupied,
+.comanda-card.inactive {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.56)),
+    var(--cd-surface);
+}
+
+.comanda-card.occupied {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(195, 124, 34, 0.2), transparent 36%),
+    linear-gradient(145deg, rgba(253, 247, 238, 0.9), rgba(255, 255, 255, 0.66));
+}
+
+.comanda-card.reserved {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(58, 112, 115, 0.16), transparent 36%),
+    linear-gradient(145deg, rgba(232, 243, 242, 0.92), rgba(255, 255, 255, 0.64));
+}
+
+.dashboard-critical-panel {
+  background:
+    radial-gradient(circle at 94% 0%, rgba(190, 65, 54, 0.1), transparent 30%),
+    var(--glass-surface-soft);
+}
+
+.product-card.product-card-disabled,
+.comanda-card.inactive,
+.mesa-comanda-card.finalized {
+  backdrop-filter: blur(6px) saturate(105%);
+  -webkit-backdrop-filter: blur(6px) saturate(105%);
+}
+
+.comanda-modal-header,
+.management-modal-header {
+  border-bottom-color: rgba(214, 214, 211, 0.74);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+}
+
+.modal-management-form {
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.modal-close-button,
+.modal-back-button,
+.ghost-button {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(214, 214, 211, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+.primary-action-button,
+.modal-primary-action,
+.mesa-release-button {
+  box-shadow: 0 16px 30px rgba(195, 124, 34, 0.2);
+}
+
+.management-form-card input,
+.management-form-card select,
+.management-form-card textarea,
+.modal-field-block input,
+.modal-field-block textarea,
+.quick-form-field input,
+.quick-form-field select,
+.quick-product-search input,
+.pedido-form-card input,
+.pedido-form-card select,
+.pedido-form-card textarea,
+.dashboard-custom-period input {
+  color: var(--cd-text);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(214, 214, 211, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
+}
+
+.management-form-card input::placeholder,
+.management-form-card textarea::placeholder,
+.modal-field-block input::placeholder,
+.modal-field-block textarea::placeholder,
+.quick-form-field input::placeholder,
+.quick-product-search input::placeholder,
+.pedido-form-card input::placeholder,
+.pedido-form-card textarea::placeholder {
+  color: rgba(111, 117, 112, 0.82);
+}
+
+.management-table,
+.order-table,
+.dashboard-column-track,
+.dashboard-empty-chart,
+.dashboard-ranking-item,
+.dashboard-category-item,
+.dashboard-critical-item,
+.customer-mode-card,
+.client-mode-option,
+.linked-mesa-card,
+.quick-helper-box,
+.empty-order-state {
+  background: rgba(255, 255, 255, 0.66);
+  border-color: rgba(214, 214, 211, 0.76);
+}
+
+.liquid-glass--dark {
+  color: var(--cd-text-inverse);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--glass-surface-dark);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.liquid-glass--light {
+  color: var(--cd-text);
+  border-color: var(--glass-border-soft);
+  background: var(--glass-surface);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .liquid-glass,
+  .liquid-glass-card,
+  .liquid-glass-modal,
+  .stat-card,
+  .dashboard-kpi-card,
+  .dashboard-chart-panel,
+  .dashboard-state-card,
+  .settings-card,
+  .management-form-card,
+  .management-list-card,
+  .detail-panel,
+  .product-card,
+  .quick-ident-card,
+  .quick-summary-card,
+  .order-context-card,
+  .order-total-panel,
+  .mesa-comanda-card,
+  .mesa-add-comanda-card,
+  .quick-comanda-card,
+  .pedido-card,
+  .pedido-form-card,
+  .pedido-details-card,
+  .caixa-session-card,
+  .caixa-entry-card,
+  .branch-card,
+  .import-export-card,
+  .scale-option-card,
+  .confirmation-card,
+  .comanda-modal,
+  .management-modal-card,
+  .system-confirmation-modal,
+  .confirmation-dialog {
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-card);
+  }
+
+  .liquid-glass--dark {
+    background: var(--cd-green-950);
+  }
+}
+
+@media (max-width: 760px) {
+  .page-stack,
+  .management-list-card,
+  .full-management-list {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .management-list-card,
+  .full-management-list {
+    overflow: hidden;
+  }
+
+  .management-table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .management-table-head,
+  .management-table-row {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .liquid-glass,
+  .liquid-glass-card,
+  .liquid-glass-modal,
+  .stat-card,
+  .dashboard-kpi-card,
+  .dashboard-chart-panel,
+  .settings-card,
+  .management-form-card,
+  .management-list-card,
+  .detail-panel,
+  .product-card,
+  .quick-ident-card,
+  .quick-summary-card,
+  .mesa-comanda-card,
+  .mesa-add-comanda-card,
+  .quick-comanda-card,
+  .pedido-card,
+  .caixa-entry-card,
+  .branch-card,
+  .import-export-card,
+  .scale-option-card {
+    box-shadow: 0 12px 28px rgba(18, 32, 25, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+    backdrop-filter: blur(8px) saturate(112%);
+    -webkit-backdrop-filter: blur(8px) saturate(112%);
+  }
+
+  .comanda-modal-overlay {
+    padding: 12px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .liquid-glass-modal,
+  .comanda-modal,
+  .management-modal-card,
+  .system-confirmation-modal,
+  .confirmation-dialog {
+    max-width: 100%;
+    max-height: calc(100dvh - 24px);
+    box-shadow: 0 20px 54px rgba(18, 32, 25, 0.28);
+    backdrop-filter: blur(12px) saturate(118%);
+    -webkit-backdrop-filter: blur(12px) saturate(118%);
+  }
+}

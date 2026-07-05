@@ -8,7 +8,7 @@ import { MapaMesaCard } from '../models/app-data';
   imports: [CurrencyPipe],
   template: `
     <button
-      class="comanda-card"
+      class="comanda-card liquid-glass-card liquid-glass-hover"
       [class.occupied]="card.status === 'ocupada'"
       [class.free]="card.status === 'livre'"
       [class.reserved]="card.status === 'reservada'"
