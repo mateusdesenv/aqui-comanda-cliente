@@ -1,4 +1,7 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import {
   ProductCategory,
   Produto,
@@ -7,7 +10,6 @@ import {
   productCategories,
   produtoTamanhos,
 } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
 
 export interface ProdutoPayload {
   nome: string;
@@ -23,16 +25,13 @@ export class ProdutosService {
   readonly categories = productCategories;
   readonly tamanhos = produtoTamanhos;
 
-  private readonly repository = new LocalStorageRepository<Produto[]>(
-    'aqui-comanda:produtos',
-    this.createDefaultProdutos(),
-  );
+  private readonly api = inject(ApiClientService);
 
-  readonly produtos = signal<Produto[]>(this.sortByName(this.normalizeProdutos(this.repository.read())));
+  readonly produtos = signal<Produto[]>([]);
   readonly produtosAtivos = computed(() => this.produtos().filter((produto) => produto.ativo));
 
   constructor() {
-    this.persist();
+    void this.reload().catch(() => undefined);
   }
 
   getProdutos(): Produto[] {
@@ -105,7 +104,9 @@ export class ProdutosService {
     };
 
     this.produtos.set(this.sortByName([...this.produtos(), produto]));
-    this.persist();
+    void lastValueFrom(this.api.post<Produto>('/produtos', payload)).then((created) => {
+      this.produtos.set(this.sortByName([...this.produtos().filter((item) => item.id !== produto.id), this.mapProduto(created)]));
+    });
     return produto;
   }
 
@@ -123,13 +124,15 @@ export class ProdutosService {
     });
 
     this.produtos.set(this.sortByName(produtos));
-    this.persist();
+    void lastValueFrom(this.api.put<Produto>(`/produtos/${id}`, payload)).then((updated) => {
+      this.produtos.set(this.sortByName(this.produtos().map((produto) => (produto.id === id ? this.mapProduto(updated) : produto))));
+    });
     return updatedProduto;
   }
 
   deleteProduto(id: string): void {
     this.produtos.set(this.produtos().filter((produto) => produto.id !== id));
-    this.persist();
+    void lastValueFrom(this.api.delete(`/produtos/${id}`));
   }
 
   hasProduto(id: string): boolean {
@@ -171,7 +174,7 @@ export class ProdutosService {
         }),
       ),
     );
-    this.persist();
+    void this.reload();
   }
 
   applyStockDeltas(deltas: Map<string, number>): void {
@@ -198,11 +201,7 @@ export class ProdutosService {
         }),
       ),
     );
-    this.persist();
-  }
-
-  private persist(): void {
-    this.repository.write(this.produtos());
+    void this.reload();
   }
 
   private sortByName(produtos: Produto[]): Produto[] {
@@ -241,11 +240,15 @@ export class ProdutosService {
 
   private normalizeProdutos(produtos: Produto[]): Produto[] {
     return produtos.map((produto) => ({
-      ...produto,
+      ...mapApiEntity(produto),
       tamanho: this.normalizeTamanho((produto as Produto & { tamanho?: string }).tamanho),
       stockQuantity: Number(produto.stockQuantity) || 0,
       costPrice: Number(produto.costPrice) || 0,
       controlaEstoque: produto.controlaEstoque ?? true,
+      descricao: produto.descricao ?? '',
+      ativo: produto.ativo ?? true,
+      createdAt: produto.createdAt ?? new Date().toISOString(),
+      updatedAt: produto.updatedAt ?? produto.createdAt ?? new Date().toISOString(),
     }));
   }
 
@@ -278,88 +281,12 @@ export class ProdutosService {
     return aliases[normalized] ?? 'medio';
   }
 
-  private createDefaultProdutos(): Produto[] {
-    const now = new Date().toISOString();
+  async reload(): Promise<void> {
+    const produtos = await lastValueFrom(this.api.list<Produto>('/produtos', { limit: 1000 }));
+    this.produtos.set(this.sortByName(this.normalizeProdutos(mapApiList(produtos))));
+  }
 
-    return [
-      {
-        id: 'x-burger',
-        nome: 'X-Burger',
-        descricao: 'Hambúrguer, queijo e molho da casa.',
-        categoria: 'Lanches',
-        tamanho: 'medio',
-        preco: 24.9,
-        stockQuantity: 0,
-        costPrice: 0,
-        ativo: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'x-salada',
-        nome: 'X-Salada',
-        descricao: 'Hambúrguer, queijo, alface, tomate e maionese.',
-        categoria: 'Lanches',
-        tamanho: 'medio',
-        preco: 26.9,
-        stockQuantity: 0,
-        costPrice: 0,
-        ativo: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'batata-frita',
-        nome: 'Batata Frita',
-        descricao: 'Porção crocante para compartilhar.',
-        categoria: 'Porções',
-        tamanho: 'grande',
-        preco: 16.9,
-        stockQuantity: 0,
-        costPrice: 0,
-        ativo: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'refrigerante-lata',
-        nome: 'Refrigerante Lata',
-        descricao: 'Lata 350 ml gelada.',
-        categoria: 'Bebidas',
-        tamanho: 'pequeno',
-        preco: 7.5,
-        stockQuantity: 0,
-        costPrice: 0,
-        ativo: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'suco-natural',
-        nome: 'Suco Natural',
-        descricao: 'Fruta da estação batida na hora.',
-        categoria: 'Bebidas',
-        tamanho: 'pequeno',
-        preco: 9,
-        stockQuantity: 0,
-        costPrice: 0,
-        ativo: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'agua-mineral',
-        nome: 'Água Mineral',
-        descricao: 'Garrafa sem gás 500 ml.',
-        categoria: 'Bebidas',
-        tamanho: 'pequeno',
-        preco: 4.5,
-        stockQuantity: 0,
-        costPrice: 0,
-        ativo: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
+  private mapProduto(produto: Produto): Produto {
+    return this.normalizeProdutos([produto])[0];
   }
 }

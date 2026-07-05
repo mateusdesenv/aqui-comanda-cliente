@@ -31,17 +31,19 @@ export const loginGuard: CanActivateFn = async () => {
     return true;
   }
 
+  await filiaisService.reload().catch(() => undefined);
   return router.createUrlTree([
     filiaisService.hasFilialCadastrada() ? authService.getFirstAllowedPath() : SETUP_FILIAIS_PATH,
   ]);
 };
 
-export const permissionGuard: CanActivateFn = (route, state) => {
+export const permissionGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const filiaisService = inject(FiliaisService);
   const router = inject(Router);
   const tela = route.data?.['tela'] as TelaSistema | undefined;
   const isFiliaisSetupRoute = state.url.startsWith(SETUP_FILIAIS_PATH);
+  await filiaisService.reload().catch(() => undefined);
   const hasFilialCadastrada = filiaisService.hasFilialCadastrada();
 
   if (!hasFilialCadastrada && isFiliaisSetupRoute) {

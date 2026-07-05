@@ -1,11 +1,12 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
 import type { IconName } from '../components/icon.component';
 
 export type ImportExportExpectedType = 'array' | 'object' | 'string' | 'any';
 
 export interface ImportExportEntry {
   alias: string;
-  storageKey: string;
   expectedType: ImportExportExpectedType;
   defaultValue: unknown;
 }
@@ -37,6 +38,8 @@ export interface ImportValidationResult {
 
 @Injectable({ providedIn: 'root' })
 export class ImportExportService {
+  private readonly api = inject(ApiClientService);
+  private backupCache: Record<string, unknown> = {};
   private readonly modules: ImportExportModule[] = [
     {
       id: 'clientes',
@@ -44,7 +47,7 @@ export class ImportExportService {
       description: 'Backup e restauração da base de clientes.',
       fileName: 'aqui-comanda-clientes.json',
       icon: 'users',
-      entries: [{ alias: 'clientes', storageKey: 'aqui-comanda:clientes', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'clientes', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'produtos',
@@ -52,7 +55,7 @@ export class ImportExportService {
       description: 'Backup e restauração dos produtos do cardápio.',
       fileName: 'aqui-comanda-produtos.json',
       icon: 'cards',
-      entries: [{ alias: 'produtos', storageKey: 'aqui-comanda:produtos', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'produtos', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'estoque',
@@ -60,7 +63,7 @@ export class ImportExportService {
       description: 'Backup e restauração do histórico de entradas de estoque.',
       fileName: 'aqui-comanda-estoque.json',
       icon: 'register',
-      entries: [{ alias: 'entradasEstoque', storageKey: 'aqui-comanda:stock-entries', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'entradasEstoque', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'mesas',
@@ -68,7 +71,7 @@ export class ImportExportService {
       description: 'Backup e restauração da configuração de mesas.',
       fileName: 'aqui-comanda-mesas.json',
       icon: 'table',
-      entries: [{ alias: 'mesas', storageKey: 'aqui-comanda:mesas', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'mesas', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'comandas',
@@ -76,7 +79,7 @@ export class ImportExportService {
       description: 'Backup e restauração das comandas e histórico operacional.',
       fileName: 'aqui-comanda-comandas.json',
       icon: 'receipt',
-      entries: [{ alias: 'comandas', storageKey: 'aqui-comanda:open-comandas', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'comandas', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'pedidos',
@@ -84,7 +87,7 @@ export class ImportExportService {
       description: 'Backup e restauração dos pedidos para entrega.',
       fileName: 'aqui-comanda-pedidos.json',
       icon: 'bell',
-      entries: [{ alias: 'pedidos', storageKey: 'aqui-comanda:pedidos', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'pedidos', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'caixa',
@@ -93,8 +96,8 @@ export class ImportExportService {
       fileName: 'aqui-comanda-caixa.json',
       icon: 'dollar',
       entries: [
-        { alias: 'entradas', storageKey: 'aqui-comanda:caixa-entradas', expectedType: 'array', defaultValue: [] },
-        { alias: 'sessoes', storageKey: 'aqui-comanda:caixa-sessoes', expectedType: 'array', defaultValue: [] },
+        { alias: 'entradas', expectedType: 'array', defaultValue: [] },
+        { alias: 'sessoes', expectedType: 'array', defaultValue: [] },
       ],
     },
     {
@@ -103,7 +106,7 @@ export class ImportExportService {
       description: 'Backup e restauração dos usuários internos e permissões.',
       fileName: 'aqui-comanda-colaboradores.json',
       icon: 'shield',
-      entries: [{ alias: 'colaboradores', storageKey: 'aqui-comanda:colaboradores', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'colaboradores', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'filiais',
@@ -111,7 +114,7 @@ export class ImportExportService {
       description: 'Backup e restauração das unidades cadastradas.',
       fileName: 'aqui-comanda-filiais.json',
       icon: 'settings',
-      entries: [{ alias: 'filiais', storageKey: 'aqui-comanda:filiais', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'filiais', expectedType: 'array', defaultValue: [] }],
     },
     {
       id: 'configuracoes',
@@ -119,7 +122,7 @@ export class ImportExportService {
       description: 'Backup e restauração das personalizações do sistema.',
       fileName: 'aqui-comanda-configuracoes.json',
       icon: 'settings',
-      entries: [{ alias: 'uiScale', storageKey: 'aqui-comanda:ui-scale', expectedType: 'string', defaultValue: 'medium' }],
+      entries: [{ alias: 'uiScale', expectedType: 'string', defaultValue: 'medium' }],
     },
     {
       id: 'ordem-menu',
@@ -127,9 +130,13 @@ export class ImportExportService {
       description: 'Backup e restauração da ordem personalizada do menu.',
       fileName: 'aqui-comanda-ordem-menu.json',
       icon: 'menu',
-      entries: [{ alias: 'ordemMenu', storageKey: 'aqui-comanda:menu-order', expectedType: 'array', defaultValue: [] }],
+      entries: [{ alias: 'ordemMenu', expectedType: 'array', defaultValue: [] }],
     },
   ];
+
+  constructor() {
+    void this.reloadBackupCache().catch(() => undefined);
+  }
 
   getModules(): ImportExportModule[] {
     return this.modules.map((module) => ({ ...module, entries: module.entries.map((entry) => ({ ...entry })) }));
@@ -148,18 +155,18 @@ export class ImportExportService {
   }
 
   exportModule(module: ImportExportModule): void {
-    const payload = this.createExportPayload(module);
-    this.downloadJson(payload, module.fileName);
+    void this.reloadBackupCache().then(() => {
+      const payload = this.createExportPayload(module);
+      this.downloadJson(payload, module.fileName);
+    });
   }
 
   exportFullBackup(): void {
-    const modules = this.getModules();
-    const payload = modules.reduce<Record<string, unknown>>((backup, module) => {
-      backup[module.id] = this.createExportPayload(module);
-      return backup;
-    }, {});
     const date = new Date().toISOString().slice(0, 10);
-    this.downloadJson(payload, `aqui-comanda-backup-completo-${date}.json`);
+    void lastValueFrom(this.api.get<Record<string, unknown>>('/backups/export')).then((payload) => {
+      this.backupCache = payload;
+      this.downloadJson(payload, `aqui-comanda-backup-completo-${date}.json`);
+    });
   }
 
   async readJsonFile(file: File): Promise<ParsedImportFile> {
@@ -262,14 +269,12 @@ export class ImportExportService {
     if (module.entries.length === 1) {
       const entry = module.entries[0];
       const value = this.isWrappedPayloadForSingleEntry(data, entry.alias) ? (data as Record<string, unknown>)[entry.alias] : data;
-      this.writeStorageValue(entry.storageKey, value);
+      void lastValueFrom(this.api.post(`/backups/import/${module.id}`, value, { mode: 'replace' })).then(() => this.reloadBackupCache());
       return;
     }
 
     const record = data as Record<string, unknown>;
-    for (const entry of module.entries) {
-      this.writeStorageValue(entry.storageKey, record[entry.alias]);
-    }
+    void lastValueFrom(this.api.post(`/backups/import/${module.id}`, record, { mode: 'replace' })).then(() => this.reloadBackupCache());
   }
 
   validateFullBackup(data: unknown): ImportValidationResult {
@@ -299,23 +304,19 @@ export class ImportExportService {
       throw new Error(validation.message ?? 'Backup completo incompatível.');
     }
 
-    const record = data as Record<string, unknown>;
-    for (const module of this.modules) {
-      this.importModule(module, record[module.id]);
-    }
+    void lastValueFrom(this.api.post('/backups/import', data, { mode: 'replace' })).then(() => this.reloadBackupCache());
   }
 
   clearModule(module: ImportExportModule): void {
-    for (const entry of module.entries) {
-      this.writeStorageValue(entry.storageKey, entry.defaultValue);
-    }
+    const payload = module.entries.length === 1 ? module.entries[0].defaultValue : module.entries.reduce<Record<string, unknown>>((record, entry) => {
+      record[entry.alias] = entry.defaultValue;
+      return record;
+    }, {});
+    void lastValueFrom(this.api.post(`/backups/import/${module.id}`, payload, { mode: 'replace' })).then(() => this.reloadBackupCache());
   }
 
   getRecordCount(module: ImportExportModule): number {
-    return module.entries.reduce((total, entry) => {
-      const value = this.readStorageValue(entry.storageKey, entry.defaultValue);
-      return total + this.countValue(value);
-    }, 0);
+    return this.countValue(this.createExportPayload(module));
   }
 
   hasData(module: ImportExportModule): boolean {
@@ -323,7 +324,7 @@ export class ImportExportService {
   }
 
   private getLastUpdated(module: ImportExportModule): string | undefined {
-    const timestamps = module.entries.flatMap((entry) => this.extractUpdatedDates(this.readStorageValue(entry.storageKey, entry.defaultValue)));
+    const timestamps = this.extractUpdatedDates(this.createExportPayload(module));
 
     if (timestamps.length === 0) {
       return undefined;
@@ -349,12 +350,12 @@ export class ImportExportService {
 
   private createExportPayload(module: ImportExportModule): unknown {
     if (module.entries.length === 1) {
-      const entry = module.entries[0];
-      return this.readStorageValue(entry.storageKey, entry.defaultValue);
+      return this.backupCache[module.id] ?? this.backupCache[module.entries[0].alias] ?? module.entries[0].defaultValue;
     }
 
     return module.entries.reduce<Record<string, unknown>>((payload, entry) => {
-      payload[entry.alias] = this.readStorageValue(entry.storageKey, entry.defaultValue);
+      const modulePayload = this.backupCache[module.id];
+      payload[entry.alias] = this.isRecord(modulePayload) && entry.alias in modulePayload ? modulePayload[entry.alias] : entry.defaultValue;
       return payload;
     }, {});
   }
@@ -401,33 +402,6 @@ export class ImportExportService {
       .join(' · ');
   }
 
-  private readStorageValue(storageKey: string, defaultValue: unknown): unknown {
-    if (typeof localStorage === 'undefined') {
-      return defaultValue;
-    }
-
-    const storedValue = localStorage.getItem(storageKey);
-
-    if (storedValue === null) {
-      return defaultValue;
-    }
-
-    try {
-      return JSON.parse(storedValue) as unknown;
-    } catch {
-      return storedValue;
-    }
-  }
-
-  private writeStorageValue(storageKey: string, value: unknown): void {
-    if (typeof localStorage === 'undefined') {
-      return;
-    }
-
-    localStorage.setItem(storageKey, JSON.stringify(value));
-    window.dispatchEvent(new StorageEvent('storage', { key: storageKey, newValue: JSON.stringify(value) }));
-  }
-
   private validateValue(value: unknown, expectedType: ImportExportExpectedType, label: string): ImportValidationResult {
     if (expectedType === 'any') {
       return { valid: true };
@@ -454,5 +428,9 @@ export class ImportExportService {
 
   private isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private async reloadBackupCache(): Promise<void> {
+    this.backupCache = await lastValueFrom(this.api.get<Record<string, unknown>>('/backups/export'));
   }
 }

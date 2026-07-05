@@ -1,6 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { StockEntry, StockEntryItem } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
 import { ProdutosService } from './produtos.service';
 
 export interface StockEntryItemPayload {
@@ -18,16 +20,13 @@ export interface StockEntryPayload {
 
 @Injectable({ providedIn: 'root' })
 export class StockEntriesService {
+  private readonly api = inject(ApiClientService);
   private readonly produtosService = inject(ProdutosService);
-  private readonly repository = new LocalStorageRepository<StockEntry[]>(
-    'aqui-comanda:stock-entries',
-    [],
-  );
 
-  readonly stockEntries = signal<StockEntry[]>(this.sortEntries(this.normalizeEntries(this.repository.read())));
+  readonly stockEntries = signal<StockEntry[]>([]);
 
   constructor() {
-    this.persist();
+    void this.reload().catch(() => undefined);
   }
 
   getStockEntries(): StockEntry[] {
@@ -69,8 +68,10 @@ export class StockEntriesService {
     };
 
     this.stockEntries.set(this.sortEntries([entry, ...this.stockEntries()]));
-    this.produtosService.applyStockEntryItems(items);
-    this.persist();
+    void lastValueFrom(this.api.post<StockEntry>('/estoque/entradas', normalizedPayload)).then(async (created) => {
+      this.stockEntries.set(this.sortEntries([this.mapStockEntry(created), ...this.stockEntries().filter((item) => item.id !== entry.id)]));
+      await this.produtosService.reload();
+    });
     return entry;
   }
 
@@ -139,10 +140,6 @@ export class StockEntriesService {
     }));
   }
 
-  private persist(): void {
-    this.repository.write(this.stockEntries());
-  }
-
   private createId(): string {
     return `stock-entry-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
@@ -153,5 +150,14 @@ export class StockEntriesService {
         new Date(second.date).getTime() - new Date(first.date).getTime() ||
         new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime(),
     );
+  }
+
+  async reload(): Promise<void> {
+    const entries = await lastValueFrom(this.api.list<StockEntry>('/estoque/entradas', { limit: 1000 }));
+    this.stockEntries.set(this.sortEntries(this.normalizeEntries(mapApiList(entries))));
+  }
+
+  private mapStockEntry(entry: StockEntry): StockEntry {
+    return this.normalizeEntries([mapApiEntity(entry)])[0];
   }
 }

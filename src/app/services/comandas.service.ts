@@ -1,7 +1,9 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Comanda, ItemComanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
 import { CaixaService } from './caixa.service';
-import { LocalStorageRepository } from './local-storage.repository';
 import { MesasService } from './mesas.service';
 import { ProdutosService } from './produtos.service';
 
@@ -15,16 +17,12 @@ interface SaveComandaPayload {
 
 @Injectable({ providedIn: 'root' })
 export class ComandasService {
+  private readonly api = inject(ApiClientService);
   private readonly caixaService = inject(CaixaService);
   private readonly mesasService = inject(MesasService);
   private readonly produtosService = inject(ProdutosService);
 
-  private readonly repository = new LocalStorageRepository<Comanda[]>(
-    'aqui-comanda:open-comandas',
-    [],
-  );
-
-  readonly comandas = signal<Comanda[]>(this.normalizeComandas(this.repository.read()));
+  readonly comandas = signal<Comanda[]>([]);
   readonly comandasAbertas = computed(() =>
     this.comandas().filter((comanda) => this.isComandaAberta(comanda)),
   );
@@ -36,7 +34,7 @@ export class ComandasService {
   );
 
   constructor() {
-    this.persist();
+    void this.reload().catch(() => undefined);
   }
 
   getComandas(): Comanda[] {
@@ -100,7 +98,7 @@ export class ComandasService {
           : comanda,
       ),
     );
-    this.persist();
+    void lastValueFrom(this.api.post(`/mesas/${mesaId}/liberar`, {})).then(async () => this.reload());
     return true;
   }
 
@@ -136,7 +134,10 @@ export class ComandasService {
     };
 
     this.comandas.set([...this.comandas(), comanda]);
-    this.persist();
+    void lastValueFrom(this.api.post<Comanda>('/comandas', payload)).then(async (created) => {
+      this.comandas.set([...this.comandas().filter((item) => item.id !== comanda.id), this.mapComanda(created)]);
+      await this.reloadDependents();
+    });
     return comanda;
   }
 
@@ -181,7 +182,10 @@ export class ComandasService {
     this.comandas.set(
       this.comandas().map((comanda) => (comanda.id === comandaId ? updatedComanda : comanda)),
     );
-    this.persist();
+    void lastValueFrom(this.api.put<Comanda>(`/comandas/${comandaId}`, payload)).then(async (updated) => {
+      this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(updated) : comanda)));
+      await this.reloadDependents();
+    });
     return updatedComanda;
   }
 
@@ -209,7 +213,10 @@ export class ComandasService {
           : currentComanda,
       ),
     );
-    this.persist();
+    void lastValueFrom(this.api.patch<Comanda>(`/comandas/${comandaId}/itens`, { items: updatedItems })).then(async (updated) => {
+      this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(updated) : comanda)));
+      await this.reloadDependents();
+    });
     return true;
   }
 
@@ -246,15 +253,10 @@ export class ComandasService {
     this.comandas.set(
       this.comandas().map((comanda) => (comanda.id === comandaId ? finalizedComanda : comanda)),
     );
-    this.persist();
-
-    const mesa = finalizedComanda.mesaId
-      ? (this.mesasService
-          .getMesas()
-          .find((currentMesa) => currentMesa.id === finalizedComanda.mesaId) ?? null)
-      : null;
-
-    this.caixaService.registrarEntradaComanda(finalizedComanda, mesa);
+    void lastValueFrom(this.api.post<Comanda>(`/comandas/${comandaId}/finalizar`, {})).then(async (finalized) => {
+      this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(finalized) : comanda)));
+      await this.reloadDependents();
+    });
     return finalizedComanda;
   }
 
@@ -277,7 +279,7 @@ export class ComandasService {
 
     this.validateAndApplyStockDelta(existingComanda.itens ?? [], []);
     this.comandas.set(this.comandas().filter((comanda) => comanda.id !== comandaId));
-    this.persist();
+    void lastValueFrom(this.api.delete(`/comandas/${comandaId}`)).then(async () => this.reloadDependents());
   }
 
   getCardForMesa(mesa: Mesa): MapaMesaCard {
@@ -325,14 +327,11 @@ export class ComandasService {
     return comanda.status === 'finalizada' || comanda.paga;
   }
 
-  private persist(): void {
-    this.repository.write(this.comandas());
-  }
-
   private normalizeComandas(comandas: Comanda[]): Comanda[] {
     return comandas
       .filter((comanda) => comanda.id !== 'comanda-mesa-02')
       .map((comanda) => {
+        const apiComanda = mapApiEntity(comanda);
         const itens = this.normalizeItems(comanda.itens ?? []);
         const mesaId = comanda.mesaId || undefined;
         const rawStatus = String((comanda as Comanda & { status?: string }).status ?? 'aberta');
@@ -342,7 +341,7 @@ export class ComandasService {
         const status = isFinalizada ? 'finalizada' : 'aberta';
 
         return {
-          ...comanda,
+          ...apiComanda,
           mesaId,
           mesaLiberadaEm: comanda.mesaLiberadaEm,
           clienteManual: comanda.clienteManual ?? !comanda.clienteId,
@@ -435,5 +434,22 @@ export class ComandasService {
     }
 
     return quantities;
+  }
+
+  async reload(): Promise<void> {
+    const comandas = await lastValueFrom(this.api.list<Comanda>('/comandas', { limit: 1000 }));
+    this.comandas.set(this.normalizeComandas(mapApiList(comandas)));
+  }
+
+  private mapComanda(comanda: Comanda): Comanda {
+    return this.normalizeComandas([comanda])[0];
+  }
+
+  private async reloadDependents(): Promise<void> {
+    await Promise.all([
+      this.reload(),
+      this.produtosService.reload(),
+      this.caixaService.reload(),
+    ]);
   }
 }

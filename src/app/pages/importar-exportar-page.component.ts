@@ -166,8 +166,8 @@ interface PendingImport {
               </div>
 
               <div class="import-export-keys">
-                @for (entry of summary.module.entries; track entry.storageKey) {
-                  <code>{{ entry.storageKey }}</code>
+                @for (entry of summary.module.entries; track entry.alias) {
+                  <code>{{ entry.alias }}</code>
                 }
               </div>
 

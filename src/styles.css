@@ -57,6 +57,7 @@
 html,
 body,
 app-root {
+  height: 100%;
   min-height: 100%;
   margin: 0;
   font-family: var(--font-body);
@@ -102,8 +103,9 @@ img {
 /* Login */
 .login-page {
   min-height: 100vh;
+  height: 100vh;
   display: grid;
-  grid-template-columns: minmax(520px, 1fr) minmax(420px, 0.82fr);
+  grid-template-columns: minmax(0, 1.08fr) minmax(430px, 0.92fr);
   background:
     radial-gradient(circle at 72% 18%, rgba(195, 124, 34, 0.08), transparent 28%),
     linear-gradient(
@@ -119,11 +121,13 @@ img {
 .brand-panel {
   position: relative;
   isolation: isolate;
-  min-height: 100vh;
-  padding: clamp(32px, 5vw, 76px);
+  height: 100%;
+  min-height: 0;
+  padding: clamp(24px, 3.4vw, 54px);
   display: grid;
   grid-template-columns: minmax(310px, 0.84fr) minmax(280px, 0.7fr);
   align-items: center;
+  gap: clamp(18px, 2.4vw, 34px);
   overflow: hidden;
   background:
     radial-gradient(circle at 12% 18%, rgba(96, 135, 114, 0.18), transparent 26%),
@@ -163,16 +167,16 @@ img {
 }
 
 .brand-logo {
-  width: min(270px, 68vw);
-  margin-bottom: clamp(46px, 6vh, 78px);
+  width: min(230px, 68vw);
+  margin-bottom: clamp(26px, 4vh, 46px);
   object-fit: contain;
   filter: drop-shadow(0 18px 32px rgba(0, 0, 0, 0.22));
 }
 
 .hero-copy .eyebrow {
   width: fit-content;
-  margin: 0 0 20px;
-  padding: 8px 13px;
+  margin: 0 0 16px;
+  padding: 7px 12px;
   border: 1px solid rgba(241, 211, 162, 0.32);
   border-radius: 999px;
   color: var(--cd-amber-400);
@@ -195,14 +199,14 @@ img {
   max-width: 590px;
   margin: 0;
   color: var(--cd-text-inverse);
-  font-size: clamp(2.9rem, 5.8vw, 5.5rem);
-  line-height: 0.96;
+  font-size: clamp(3.6rem, 5.2vw, 6rem);
+  line-height: 0.95;
   text-wrap: balance;
 }
 
 .hero-copy > p:not(.eyebrow) {
   max-width: 520px;
-  margin: 24px 0 0;
+  margin: 18px 0 0;
   color: rgba(255, 255, 255, 0.74);
   font-size: clamp(1rem, 1.35vw, 1.22rem);
   line-height: 1.58;
@@ -211,21 +215,21 @@ img {
 .feature-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(210px, 1fr));
-  gap: 20px 22px;
-  margin-top: clamp(36px, 5vh, 56px);
+  gap: 16px 18px;
+  margin-top: clamp(26px, 3.8vh, 42px);
 }
 
 .feature-item {
   display: grid;
-  grid-template-columns: 54px 1fr;
+  grid-template-columns: 48px 1fr;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   color: var(--cd-text-inverse);
 }
 
 .feature-icon {
-  width: 54px;
-  height: 54px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(241, 211, 162, 0.22);
@@ -253,15 +257,15 @@ img {
   display: flex;
   align-items: center;
   gap: 15px;
-  margin-top: clamp(48px, 7vh, 76px);
-  padding-top: 24px;
+  margin-top: clamp(28px, 4.4vh, 48px);
+  padding-top: 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--cd-text-inverse);
 }
 
 .shield-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 14px;
@@ -289,9 +293,13 @@ img {
 
 .preview-stack {
   position: relative;
-  min-height: 560px;
+  min-height: 0;
+  height: min(520px, calc(100vh - 96px));
+  max-height: 100%;
   display: grid;
   place-items: center;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .restaurant-line-art {
@@ -333,8 +341,8 @@ img {
 }
 
 .tables-card {
-  width: min(370px, 100%);
-  padding: 22px;
+  width: min(340px, 100%);
+  padding: 18px;
   border-radius: 24px;
   color: var(--cd-text-inverse);
   transform: translate(12px, -24px);
@@ -350,7 +358,7 @@ img {
 
 .card-header {
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   color: rgba(255, 255, 255, 0.82);
 }
 
@@ -372,12 +380,12 @@ img {
 .tables-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .table-pill {
-  min-height: 78px;
-  padding: 13px;
+  min-height: 68px;
+  padding: 11px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -421,14 +429,14 @@ img {
   position: absolute;
   right: 4%;
   bottom: 10%;
-  width: min(340px, 100%);
-  padding: 22px;
+  width: min(310px, 100%);
+  padding: 18px;
   border-radius: 22px;
   color: var(--cd-text-inverse);
 }
 
 .order-title {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   font-size: 1.05rem;
   font-weight: 800;
 }
@@ -436,7 +444,7 @@ img {
 .order-line {
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 0;
+  padding: 6px 0;
   color: rgba(255, 255, 255, 0.78);
   font-size: 0.9rem;
 }
@@ -451,8 +459,8 @@ img {
 
 .order-total {
   justify-content: space-between;
-  margin-top: 12px;
-  padding-top: 16px;
+  margin-top: 8px;
+  padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   font-weight: 800;
 }
@@ -464,10 +472,13 @@ img {
 
 .login-panel {
   position: relative;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: clamp(24px, 4vw, 72px);
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(20px, 3vw, 40px);
+  overflow: hidden;
   background:
     radial-gradient(circle at 80% 18%, rgba(195, 124, 34, 0.1), transparent 26%),
     radial-gradient(circle at 14% 82%, rgba(47, 83, 65, 0.08), transparent 32%), var(--cd-bg);
@@ -499,8 +510,9 @@ img {
 .login-card {
   position: relative;
   z-index: 1;
-  width: min(100%, 470px);
-  padding: clamp(30px, 4vw, 48px);
+  width: min(100%, 460px);
+  max-height: calc(100vh - 64px);
+  padding: 34px 42px;
   border: 1px solid var(--cd-border);
   border-radius: 26px;
   background: rgba(255, 255, 255, 0.94);
@@ -512,16 +524,16 @@ img {
 }
 
 .login-brand-icon {
-  width: 92px;
-  height: 92px;
-  margin: 0 auto 12px;
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 8px;
   display: grid;
   place-items: center;
 }
 
 .login-brand-icon img {
-  width: 86px;
-  height: 86px;
+  width: 68px;
+  height: 68px;
   object-fit: contain;
 }
 
@@ -529,7 +541,7 @@ img {
   margin: 0;
   text-align: center;
   font-family: var(--font-title);
-  font-size: clamp(2.15rem, 4vw, 3.05rem);
+  font-size: clamp(2rem, 3vw, 2.75rem);
   font-weight: 400;
   letter-spacing: -0.06em;
   line-height: 1;
@@ -537,7 +549,7 @@ img {
 
 .login-card > p {
   max-width: 300px;
-  margin: 12px auto 34px;
+  margin: 10px auto 22px;
   color: var(--cd-text-muted);
   text-align: center;
   font-size: 1rem;
@@ -548,7 +560,7 @@ img {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  margin: 0 0 22px;
+  margin: 0 0 18px;
   padding: 5px;
   border: 1px solid var(--cd-border);
   border-radius: 12px;
@@ -563,7 +575,7 @@ img {
 }
 
 .auth-tabs button {
-  min-height: 42px;
+  min-height: 38px;
   border-radius: 9px;
   color: var(--cd-text-muted);
   background: transparent;
@@ -618,7 +630,7 @@ img {
 
 .login-fields {
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
 .login-fields label,
@@ -641,10 +653,16 @@ img {
 }
 
 .input-control {
-  height: 54px;
-  margin-bottom: 16px;
+  height: 44px;
+  min-height: 44px;
+  margin-bottom: 0;
   padding: 0 15px;
   border-radius: 12px;
+}
+
+.login-card .input-control {
+  height: 44px;
+  min-height: 44px;
 }
 
 .input-control:focus-within,
@@ -682,7 +700,7 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 0 26px;
+  margin: 12px 0 18px;
   color: var(--cd-text-muted);
   font-size: 0.92rem;
 }
@@ -709,7 +727,8 @@ img {
 .primary-button,
 .google-button {
   width: 100%;
-  height: 58px;
+  height: 48px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -717,6 +736,12 @@ img {
   border-radius: 12px;
   font-weight: 800;
   transition: 160ms ease;
+}
+
+.login-card .primary-button,
+.login-card .google-button {
+  height: 48px;
+  min-height: 48px;
 }
 
 .primary-button {
@@ -735,7 +760,7 @@ img {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 14px;
-  margin: 22px 0;
+  margin: 16px 0;
   color: var(--cd-text-muted);
 }
 
@@ -757,7 +782,7 @@ img {
 
 .protected-note {
   position: absolute;
-  bottom: clamp(22px, 5vh, 56px);
+  bottom: 18px;
   left: 50%;
   display: flex;
   align-items: center;
@@ -2328,28 +2353,16 @@ img {
 }
 
 @media (max-width: 1280px) {
-  .login-page {
-    grid-template-columns: 1fr;
-    overflow: auto;
-  }
-
-  .brand-panel {
-    min-height: auto;
-    grid-template-columns: 1fr;
-    padding-bottom: 46px;
-  }
-
   .preview-stack {
     display: none;
   }
 
-  .login-panel {
-    min-height: auto;
-    padding: 52px 24px 78px;
+  .brand-panel {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .protected-note {
-    bottom: 26px;
+  .login-page {
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 0.86fr);
   }
 
   .stats-grid {
@@ -2406,6 +2419,169 @@ img {
   .stock-management-table .management-table-head,
   .stock-management-table .management-table-row {
     min-width: 920px;
+  }
+}
+
+@media (max-height: 780px) and (min-width: 901px) {
+  .brand-panel {
+    padding: 22px 40px;
+  }
+
+  .brand-logo {
+    width: 190px;
+    margin-bottom: 22px;
+  }
+
+  .hero-copy .eyebrow {
+    margin-bottom: 12px;
+    padding: 6px 11px;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(3.15rem, 4.8vw, 5.15rem);
+  }
+
+  .hero-copy > p:not(.eyebrow) {
+    margin-top: 14px;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .feature-list {
+    gap: 12px 16px;
+    margin-top: 22px;
+  }
+
+  .feature-item {
+    grid-template-columns: 42px 1fr;
+  }
+
+  .feature-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  .feature-item span,
+  .security-note span {
+    font-size: 0.82rem;
+  }
+
+  .security-note {
+    margin-top: 22px;
+    padding-top: 14px;
+  }
+
+  .shield-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .login-panel {
+    padding: 18px 32px;
+  }
+
+  .login-card {
+    padding: 26px 36px;
+  }
+
+  .login-brand-icon {
+    width: 58px;
+    height: 58px;
+    margin-bottom: 6px;
+  }
+
+  .login-brand-icon img {
+    width: 56px;
+    height: 56px;
+  }
+
+  .auth-tabs {
+    margin-bottom: 14px;
+  }
+
+  .auth-tabs button {
+    min-height: 34px;
+  }
+
+  .login-card h2 {
+    font-size: 2.25rem;
+  }
+
+  .login-card > p {
+    margin: 8px auto 16px;
+    font-size: 0.92rem;
+    line-height: 1.38;
+  }
+
+  .login-fields {
+    gap: 5px;
+  }
+
+  .login-fields label {
+    font-size: 0.8rem;
+  }
+
+  .login-card .input-control {
+    height: 38px;
+    min-height: 38px;
+    border-radius: 10px;
+  }
+
+  .form-options {
+    margin: 10px 0 14px;
+    font-size: 0.86rem;
+  }
+
+  .login-card .primary-button,
+  .login-card .google-button {
+    height: 42px;
+    min-height: 42px;
+  }
+
+  .divider {
+    margin: 12px 0;
+  }
+
+  .protected-note {
+    bottom: 10px;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .login-page {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .brand-panel {
+    height: auto;
+    min-height: auto;
+    grid-template-columns: 1fr;
+    padding: 34px 24px 42px;
+  }
+
+  .preview-stack {
+    display: none;
+  }
+
+  .login-panel {
+    height: auto;
+    min-height: auto;
+    padding: 42px 24px 72px;
+    overflow: visible;
+  }
+
+  .login-card {
+    max-height: none;
+  }
+
+  .protected-note {
+    bottom: 24px;
   }
 }
 

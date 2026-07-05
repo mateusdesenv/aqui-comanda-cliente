@@ -1,25 +1,18 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Colaborador, Comanda, EntradaCaixa, Mesa, SessaoCaixa } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
 
 @Injectable({ providedIn: 'root' })
 export class CaixaService {
-  private readonly entradasRepository = new LocalStorageRepository<EntradaCaixa[]>(
-    'aqui-comanda:caixa-entradas',
-    [],
-  );
+  private readonly api = inject(ApiClientService);
 
-  private readonly sessoesRepository = new LocalStorageRepository<SessaoCaixa[]>(
-    'aqui-comanda:caixa-sessoes',
-    [],
-  );
-
-  readonly entradas = signal<EntradaCaixa[]>(this.normalizeEntradas(this.entradasRepository.read()));
-  readonly sessoes = signal<SessaoCaixa[]>(this.normalizeSessoes(this.sessoesRepository.read()));
+  readonly entradas = signal<EntradaCaixa[]>([]);
+  readonly sessoes = signal<SessaoCaixa[]>([]);
 
   constructor() {
-    this.persistEntradas();
-    this.persistSessoes();
+    void this.reload().catch(() => undefined);
   }
 
   getEntradas(): EntradaCaixa[] {
@@ -56,7 +49,7 @@ export class CaixaService {
     };
 
     this.sessoes.set([sessao, ...this.sessoes()]);
-    this.persistSessoes();
+    void lastValueFrom(this.api.post<SessaoCaixa>('/caixa/sessoes/abrir', { observacaoAbertura })).then(async () => this.reload());
     return sessao;
   }
 
@@ -84,7 +77,7 @@ export class CaixaService {
     this.sessoes.set(
       this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? sessaoFechada : sessao)),
     );
-    this.persistSessoes();
+    void lastValueFrom(this.api.post<SessaoCaixa>(`/caixa/sessoes/${sessaoAberta.id}/fechar`, { observacaoFechamento })).then(async () => this.reload());
     return sessaoFechada;
   }
 
@@ -164,9 +157,7 @@ export class CaixaService {
       comandaFinalizadaEm: comanda.finalizadaEm ?? now,
     };
 
-    this.entradas.set(this.sortEntradas([entrada, ...this.entradas()]));
-    this.persistEntradas();
-    this.recalcularSessaoAberta();
+    void this.reload();
     return entrada;
   }
 
@@ -187,15 +178,6 @@ export class CaixaService {
     this.sessoes.set(
       this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? updatedSessao : sessao)),
     );
-    this.persistSessoes();
-  }
-
-  private persistEntradas(): void {
-    this.entradasRepository.write(this.entradas());
-  }
-
-  private persistSessoes(): void {
-    this.sessoesRepository.write(this.sessoes());
   }
 
   private normalizeEntradas(entradas: EntradaCaixa[]): EntradaCaixa[] {
@@ -203,8 +185,8 @@ export class CaixaService {
       entradas
         .filter((entrada) => entrada.tipo === 'comanda' && entrada.origemId && Number(entrada.valor) > 0)
         .map((entrada) => ({
-          ...entrada,
-          id: entrada.id ?? `entrada-${entrada.origemId}`,
+          ...mapApiEntity(entrada),
+          id: entrada.id ?? (entrada as EntradaCaixa & { _id?: string })._id ?? `entrada-${entrada.origemId}`,
           tipo: 'comanda',
           origemDescricao: entrada.origemDescricao ?? `Comanda ${entrada.origemId}`,
           clienteNome: entrada.clienteNome ?? 'Cliente não informado',
@@ -274,5 +256,14 @@ export class CaixaService {
   private getShortId(id: string): string {
     const parts = id.split('-').filter(Boolean);
     return parts.slice(-2).join('-') || id;
+  }
+
+  async reload(): Promise<void> {
+    const [sessoes, entradas] = await Promise.all([
+      lastValueFrom(this.api.list<SessaoCaixa>('/caixa/sessoes', { limit: 500 })),
+      lastValueFrom(this.api.list<EntradaCaixa>('/caixa/entradas', { limit: 1000 })),
+    ]);
+    this.entradas.set(this.normalizeEntradas(mapApiList(entradas)));
+    this.sessoes.set(this.normalizeSessoes(mapApiList(sessoes)));
   }
 }

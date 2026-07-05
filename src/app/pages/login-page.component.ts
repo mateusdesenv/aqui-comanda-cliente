@@ -429,7 +429,8 @@ export class LoginPageComponent {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
-  private redirectToHome(): Promise<boolean> {
+  private async redirectToHome(): Promise<boolean> {
+    await this.filiaisService.reload().catch(() => undefined);
     return this.router.navigateByUrl(
       this.filiaisService.hasFilialCadastrada() ? this.authService.getFirstAllowedPath() : '/configuracoes/filiais',
     );

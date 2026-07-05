@@ -11,11 +11,11 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
 import { firebaseAuth } from '../config/firebase';
-import { Colaborador, TelaSistema, telasSistema } from '../models/app-data';
+import { Colaborador, NivelAcesso, PermissaoTela, TelaSistema, telasSistema } from '../models/app-data';
 import { ColaboradoresService } from './colaboradores.service';
-
-const AUTH_PROFILE_MAP_KEY = 'aqui-comanda:firebase-colaboradores';
 
 export interface AuthenticatedUser {
   uid: string;
@@ -27,11 +27,12 @@ export interface AuthenticatedUser {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private readonly api = inject(ApiClientService);
   private readonly colaboradoresService = inject(ColaboradoresService);
   private readonly auth = firebaseAuth;
   private readonly provider = new GoogleAuthProvider();
   private readonly currentFirebaseUser = signal<User | null>(this.auth.currentUser);
-  private readonly currentUserId = signal<string | null>(null);
+  private readonly currentMembership = signal<Colaborador | null>(null);
   private readonly isAuthReady = signal(false);
   private readonly authReadyPromise: Promise<void>;
 
@@ -44,16 +45,13 @@ export class AuthService {
   readonly isLoadingAuth = computed(() => !this.isAuthReady());
   readonly isAuthenticated = computed(() => Boolean(this.currentFirebaseUser()));
 
-  readonly currentUser = computed<Colaborador | null>(() => {
-    const id = this.currentUserId();
-    return id ? this.colaboradoresService.getColaboradorById(id) : null;
-  });
+  readonly currentUser = computed<Colaborador | null>(() => this.currentMembership());
 
   constructor() {
     this.authReadyPromise = new Promise((resolve) => {
-      onAuthStateChanged(this.auth, (user) => {
+      onAuthStateChanged(this.auth, async (user) => {
         this.currentFirebaseUser.set(user);
-        this.currentUserId.set(user ? this.ensureColaboradorForFirebaseUser(user) : null);
+        this.currentMembership.set(user ? await this.loadApiProfile() : null);
         this.isAuthReady.set(true);
         resolve();
       });
@@ -67,7 +65,7 @@ export class AuthService {
   async loginWithEmail(email: string, password: string): Promise<AuthenticatedUser> {
     const credential = await signInWithEmailAndPassword(this.auth, email.trim(), password);
     this.currentFirebaseUser.set(credential.user);
-    this.currentUserId.set(this.ensureColaboradorForFirebaseUser(credential.user));
+    this.currentMembership.set(await this.loadApiProfile());
     return this.mapFirebaseUser(credential.user);
   }
 
@@ -79,21 +77,21 @@ export class AuthService {
     }
 
     this.currentFirebaseUser.set(this.auth.currentUser ?? credential.user);
-    this.currentUserId.set(this.ensureColaboradorForFirebaseUser(this.auth.currentUser ?? credential.user, name));
+    this.currentMembership.set(await this.loadApiProfile());
     return this.mapFirebaseUser(this.auth.currentUser ?? credential.user);
   }
 
   async loginWithGoogle(): Promise<AuthenticatedUser> {
     const credential = await signInWithPopup(this.auth, this.provider);
     this.currentFirebaseUser.set(credential.user);
-    this.currentUserId.set(this.ensureColaboradorForFirebaseUser(credential.user));
+    this.currentMembership.set(await this.loadApiProfile());
     return this.mapFirebaseUser(credential.user);
   }
 
   async logout(): Promise<void> {
     await signOut(this.auth);
     this.currentFirebaseUser.set(null);
-    this.currentUserId.set(null);
+    this.currentMembership.set(null);
   }
 
   async resetPassword(email: string): Promise<void> {
@@ -105,9 +103,9 @@ export class AuthService {
   }
 
   onAuthStateChange(callback: (user: AuthenticatedUser | null) => void): () => void {
-    return onAuthStateChanged(this.auth, (user) => {
+    return onAuthStateChanged(this.auth, async (user) => {
       this.currentFirebaseUser.set(user);
-      this.currentUserId.set(user ? this.ensureColaboradorForFirebaseUser(user) : null);
+      this.currentMembership.set(user ? await this.loadApiProfile() : null);
       callback(user ? this.mapFirebaseUser(user) : null);
     });
   }
@@ -124,20 +122,11 @@ export class AuthService {
     const firebaseUser = this.currentFirebaseUser();
 
     if (!firebaseUser) {
-      this.currentUserId.set(null);
+      this.currentMembership.set(null);
       return;
     }
 
-    const colaboradorId = this.ensureColaboradorForFirebaseUser(firebaseUser);
-    const currentUser = this.colaboradoresService.getColaboradorById(colaboradorId);
-
-    if (!currentUser || !currentUser.ativo) {
-      this.currentUserId.set(null);
-      void this.logout();
-      return;
-    }
-
-    this.currentUserId.set(colaboradorId);
+    void this.loadApiProfile().then((profile) => this.currentMembership.set(profile));
   }
 
   canRead(tela: TelaSistema): boolean {
@@ -203,36 +192,6 @@ export class AuthService {
     return messages[code] ?? 'Erro ao autenticar. Tente novamente.';
   }
 
-  private ensureColaboradorForFirebaseUser(user: User, fallbackName?: string): string {
-    const storedMap = this.readProfileMap();
-    const storedId = storedMap[user.uid];
-
-    if (storedId && this.colaboradoresService.getColaboradorById(storedId)) {
-      return storedId;
-    }
-
-    const email = user.email?.trim().toLowerCase();
-    const existingColaborador = this.colaboradoresService
-      .getColaboradores()
-      .find((colaborador) => colaborador.usuario.trim().toLowerCase() === email);
-
-    if (existingColaborador) {
-      this.writeProfileMap({ ...storedMap, [user.uid]: existingColaborador.id });
-      return existingColaborador.id;
-    }
-
-    const colaborador = this.colaboradoresService.createColaborador({
-      nome: fallbackName?.trim() || user.displayName || email || 'Usuário Firebase',
-      usuario: email || user.uid,
-      nivel: 'admin',
-      ativo: true,
-      permissoes: this.colaboradoresService.createFullPermissoes(),
-    });
-
-    this.writeProfileMap({ ...storedMap, [user.uid]: colaborador.id });
-    return colaborador.id;
-  }
-
   private mapFirebaseUser(user: User): AuthenticatedUser {
     return {
       uid: user.uid,
@@ -247,24 +206,21 @@ export class AuthService {
     return typeof error === 'object' && error !== null && 'code' in error;
   }
 
-  private readProfileMap(): Record<string, string> {
-    if (typeof localStorage === 'undefined') {
-      return {};
-    }
+  private async loadApiProfile(): Promise<Colaborador | null> {
+    const profile = await lastValueFrom(this.api.get<Record<string, any>>('/auth/me'));
+    const nivel = (profile['role'] ?? profile['nivel'] ?? 'colaborador') as NivelAcesso;
+    const permissoes = (profile['permissoes'] ?? []) as PermissaoTela[];
 
-    try {
-      return JSON.parse(localStorage.getItem(AUTH_PROFILE_MAP_KEY) ?? '{}') as Record<string, string>;
-    } catch {
-      localStorage.removeItem(AUTH_PROFILE_MAP_KEY);
-      return {};
-    }
-  }
-
-  private writeProfileMap(profileMap: Record<string, string>): void {
-    if (typeof localStorage === 'undefined') {
-      return;
-    }
-
-    localStorage.setItem(AUTH_PROFILE_MAP_KEY, JSON.stringify(profileMap));
+    return {
+      id: String(profile['membershipId'] ?? profile['id'] ?? profile['uid']),
+      nome: String(profile['name'] ?? profile['nome'] ?? profile['email'] ?? 'Usuário'),
+      usuario: String(profile['email'] ?? profile['usuario'] ?? profile['uid']),
+      senha: '',
+      nivel,
+      ativo: true,
+      permissoes: this.colaboradoresService.normalizePermissoes(permissoes, nivel),
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+    };
   }
 }

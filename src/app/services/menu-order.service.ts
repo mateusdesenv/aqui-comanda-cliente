@@ -1,4 +1,6 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
 import { TelaSistema } from '../models/app-data';
 import type { IconName } from '../components/icon.component';
 
@@ -12,8 +14,6 @@ export interface NavigationMenuItem {
   badge?: string;
   children?: NavigationMenuItem[];
 }
-
-const MENU_ORDER_KEY = 'aqui-comanda:menu-order';
 
 export const defaultMenuItems: NavigationMenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dollar', tela: 'dashboard' },
@@ -88,9 +88,14 @@ export const defaultMenuItems: NavigationMenuItem[] = [
 
 @Injectable({ providedIn: 'root' })
 export class MenuOrderService {
-  private readonly order = signal<string[]>(this.readOrder());
+  private readonly api = inject(ApiClientService);
+  private readonly order = signal<string[]>([]);
 
   readonly menuItems = computed(() => this.applyOrder(defaultMenuItems, this.order()));
+
+  constructor() {
+    void this.reload().catch(() => undefined);
+  }
 
   getDefaultMenuItems(): NavigationMenuItem[] {
     return [...defaultMenuItems];
@@ -103,15 +108,14 @@ export class MenuOrderService {
   saveOrder(order: string[]): void {
     const normalizedOrder = this.normalizeOrder(order);
     this.order.set(normalizedOrder);
-    this.writeOrder(normalizedOrder);
+    void lastValueFrom(this.api.put<{ menuOrder: string[] }>('/configuracoes/menu-order', { menuOrder: normalizedOrder })).then((settings) => {
+      this.order.set(this.normalizeOrder(settings.menuOrder ?? []));
+    });
   }
 
   restoreDefaultOrder(): void {
     this.order.set([]);
-
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(MENU_ORDER_KEY);
-    }
+    void lastValueFrom(this.api.put<{ menuOrder: string[] }>('/configuracoes/menu-order', { menuOrder: [] }));
   }
 
   private applyOrder(menuItems: NavigationMenuItem[], order: string[]): NavigationMenuItem[] {
@@ -123,40 +127,6 @@ export class MenuOrderService {
     const newOrMissingItems = menuItems.filter((item) => !orderedIds.has(item.id));
 
     return [...orderedItems, ...newOrMissingItems];
-  }
-
-  private readOrder(): string[] {
-    if (typeof localStorage === 'undefined') {
-      return [];
-    }
-
-    try {
-      const storedOrder = localStorage.getItem(MENU_ORDER_KEY);
-
-      if (!storedOrder) {
-        return [];
-      }
-
-      const parsedOrder = JSON.parse(storedOrder);
-
-      if (!Array.isArray(parsedOrder)) {
-        localStorage.removeItem(MENU_ORDER_KEY);
-        return [];
-      }
-
-      return this.normalizeOrder(parsedOrder);
-    } catch {
-      localStorage.removeItem(MENU_ORDER_KEY);
-      return [];
-    }
-  }
-
-  private writeOrder(order: string[]): void {
-    if (typeof localStorage === 'undefined') {
-      return;
-    }
-
-    localStorage.setItem(MENU_ORDER_KEY, JSON.stringify(order));
   }
 
   private normalizeOrder(order: unknown[]): string[] {
@@ -174,5 +144,10 @@ export class MenuOrderService {
     }
 
     return normalizedOrder;
+  }
+
+  private async reload(): Promise<void> {
+    const settings = await lastValueFrom(this.api.get<{ menuOrder: string[] }>('/configuracoes/menu-order'));
+    this.order.set(this.normalizeOrder(settings.menuOrder ?? []));
   }
 }
