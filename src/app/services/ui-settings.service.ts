@@ -1,9 +1,11 @@
 import { Injectable, signal } from '@angular/core';
 
-export type UiScale = 'small' | 'medium' | 'large';
+export type UiScale = 'mini' | 'tiny' | 'small' | 'medium' | 'large';
 
 const STORAGE_KEY = 'aqui-comanda:ui-scale';
 const SCALE_CLASSES: Record<UiScale, string> = {
+  mini: 'ui-scale-mini',
+  tiny: 'ui-scale-tiny',
   small: 'ui-scale-small',
   medium: 'ui-scale-medium',
   large: 'ui-scale-large',
@@ -34,7 +36,13 @@ export class UiSettingsService {
 
     const storedScale = localStorage.getItem(STORAGE_KEY);
 
-    if (storedScale === 'small' || storedScale === 'medium' || storedScale === 'large') {
+    if (
+      storedScale === 'mini' ||
+      storedScale === 'tiny' ||
+      storedScale === 'small' ||
+      storedScale === 'medium' ||
+      storedScale === 'large'
+    ) {
       return storedScale;
     }
 
@@ -53,6 +61,8 @@ export class UiSettingsService {
 
   getScaleLabel(scale: UiScale = this.scale()): string {
     const labels: Record<UiScale, string> = {
+      mini: 'Mini',
+      tiny: 'Muito pequeno',
       small: 'Pequeno',
       medium: 'Médio',
       large: 'Grande',

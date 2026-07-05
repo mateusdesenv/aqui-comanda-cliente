@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IconComponent, IconName } from '../components/icon.component';
 import { AuthService } from '../services/auth.service';
+import { FiliaisService } from '../services/filiais.service';
 
 interface Feature {
   title: string;
@@ -188,6 +189,7 @@ interface PreviewTable {
 export class LoginPageComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly filiaisService = inject(FiliaisService);
 
   protected usuario = 'admin';
   protected senha = 'admin';
@@ -224,6 +226,8 @@ export class LoginPageComponent {
       return;
     }
 
-    this.router.navigateByUrl(this.authService.getFirstAllowedPath());
+    this.router.navigateByUrl(
+      this.filiaisService.hasFilialCadastrada() ? this.authService.getFirstAllowedPath() : '/configuracoes/filiais',
+    );
   }
 }

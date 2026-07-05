@@ -1,5 +1,17 @@
 export type ComandaStatus = 'aberta' | 'finalizada';
-export type ProductCategory = 'Lanches' | 'Bebidas' | 'Porções' | 'Sobremesas';
+export type ProductCategory =
+  | 'Bebidas'
+  | 'Sinuca'
+  | 'Petiscos'
+  | 'Lanches'
+  | 'Drinks'
+  | 'Cervejas'
+  | 'Chopp'
+  | 'Extras'
+  | 'Destilados'
+  | 'Porções'
+  | 'Sobremesas';
+export type ProdutoTamanho = 'mini' | 'muito_pequeno' | 'pequeno' | 'medio' | 'grande';
 export type MesaStatus = 'livre' | 'reservada' | 'inativa';
 export type MapaMesaStatus = 'livre' | 'ocupada' | 'reservada' | 'inativa';
 
@@ -14,6 +26,7 @@ export type StatusCaixa = 'aberto' | 'fechado';
 export type NivelAcesso = 'admin' | 'colaborador';
 
 export type TelaSistema =
+  | 'dashboard'
   | 'mapa'
   | 'comandas'
   | 'mesas'
@@ -21,6 +34,7 @@ export type TelaSistema =
   | 'pedidos'
   | 'caixa'
   | 'cardapio'
+  | 'estoque'
   | 'relatorios'
   | 'configuracoes'
   | 'colaboradores';
@@ -59,6 +73,7 @@ export interface EnderecoFilial {
 
 export interface Filial {
   id: string;
+  codigo?: string;
   nome: string;
   descricao?: string;
   endereco: EnderecoFilial;
@@ -84,6 +99,7 @@ export interface ItemPedido {
   id: string;
   productId: string;
   nome: string;
+  tamanho?: ProdutoTamanho;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;
@@ -173,21 +189,48 @@ export interface ResumoComandas {
 
 export interface Produto {
   id: string;
+  codigo?: string;
   nome: string;
   descricao: string;
   categoria: ProductCategory;
+  tamanho: ProdutoTamanho;
   preco: number;
+  stockQuantity: number;
+  costPrice: number;
+  controlaEstoque?: boolean;
   ativo: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StockEntry {
+  id: string;
+  date: string;
+  notes?: string;
+  supplierName?: string;
+  totalCost: number;
+  items: StockEntryItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StockEntryItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
 }
 
 export interface ItemComanda {
   id: string;
   productId: string;
   nome: string;
+  tamanho?: ProdutoTamanho;
   quantidade: number;
   precoUnitario: number;
+  unitCost?: number;
+  totalCost?: number;
   subtotal: number;
 }
 
@@ -221,16 +264,38 @@ export interface MapaMesaCard {
   mesaLiberacaoPendente?: boolean;
 }
 
-export const productCategories: ProductCategory[] = ['Lanches', 'Bebidas', 'Porções', 'Sobremesas'];
+export const productCategories: ProductCategory[] = [
+  'Bebidas',
+  'Sinuca',
+  'Petiscos',
+  'Lanches',
+  'Drinks',
+  'Cervejas',
+  'Chopp',
+  'Extras',
+  'Destilados',
+  'Porções',
+  'Sobremesas',
+];
+
+export const produtoTamanhos: Array<{ id: ProdutoTamanho; label: string; ordem: number }> = [
+  { id: 'mini', label: 'Mini', ordem: 1 },
+  { id: 'muito_pequeno', label: 'Muito pequeno', ordem: 2 },
+  { id: 'pequeno', label: 'Pequeno', ordem: 3 },
+  { id: 'medio', label: 'Médio', ordem: 4 },
+  { id: 'grande', label: 'Grande', ordem: 5 },
+];
 
 export const telasSistema: TelaPermissaoConfig[] = [
-  { tela: 'mapa', label: 'Dashboard / Mapa', path: '/mapa' },
+  { tela: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+  { tela: 'mapa', label: 'Mapa de Comandas', path: '/mapa' },
   { tela: 'comandas', label: 'Comandas', path: '/comandas' },
   { tela: 'mesas', label: 'Mesas', path: '/mesas' },
   { tela: 'clientes', label: 'Clientes', path: '/clientes' },
   { tela: 'pedidos', label: 'Pedidos', path: '/pedidos' },
   { tela: 'caixa', label: 'Caixa', path: '/caixa' },
   { tela: 'cardapio', label: 'Cardápio / Produtos', path: '/cardapio' },
+  { tela: 'estoque', label: 'Entrada de Estoque', path: '/estoque/entradas' },
   { tela: 'relatorios', label: 'Relatórios', path: '/relatorios' },
   { tela: 'configuracoes', label: 'Configurações', path: '/configuracoes/personalizacoes' },
   { tela: 'colaboradores', label: 'Colaboradores', path: '/colaboradores' },

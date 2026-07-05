@@ -1,17 +1,18 @@
 import { Component, HostListener, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
-import { ProductCategory, Produto } from '../models/app-data';
+import { ProductCategory, Produto, ProdutoTamanho } from '../models/app-data';
 import { ProdutoPayload, ProdutosService } from '../services/produtos.service';
 
 type ProdutoStatusFilter = 'todos' | 'ativo' | 'inativo';
 type ProdutoDescriptionFilter = 'todos' | 'com_descricao' | 'sem_descricao';
-type ProdutoSortOption = 'nome_az' | 'nome_za' | 'menor_preco' | 'maior_preco' | 'mais_recentes' | 'mais_antigos' | 'categoria';
+type ProdutoSortOption = 'nome_az' | 'nome_za' | 'menor_preco' | 'maior_preco' | 'mais_recentes' | 'mais_antigos' | 'categoria' | 'tamanho';
 
 interface ProdutoFormModel {
   nome: string;
   descricao: string;
   categoria: ProductCategory;
+  tamanho: ProdutoTamanho;
   preco: number | null;
   ativo: boolean;
 }
@@ -58,6 +59,16 @@ interface ProdutoFormModel {
         </label>
 
         <label>
+          Tamanho
+          <select name="cardapioTamanho" [(ngModel)]="sizeFilter">
+            <option value="todos">Todos</option>
+            @for (tamanho of tamanhoOptions; track tamanho.id) {
+              <option [value]="tamanho.id">{{ tamanho.label }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
           Status
           <select name="cardapioStatus" [(ngModel)]="statusFilter">
             <option value="todos">Todos</option>
@@ -85,6 +96,7 @@ interface ProdutoFormModel {
             <option value="mais_recentes">Mais recentes</option>
             <option value="mais_antigos">Mais antigos</option>
             <option value="categoria">Categoria</option>
+            <option value="tamanho">Tamanho</option>
           </select>
         </label>
 
@@ -115,6 +127,7 @@ interface ProdutoFormModel {
           <div class="management-table-head">
             <span>Produto</span>
             <span>Categoria</span>
+            <span>Tamanho</span>
             <span>Preço</span>
             <span>Status</span>
             <span>Ações</span>
@@ -127,6 +140,7 @@ interface ProdutoFormModel {
                 <small>{{ produto.descricao || 'Sem descrição' }}</small>
               </div>
               <span>{{ produto.categoria }}</span>
+              <span class="product-size-chip">{{ getTamanhoLabel(produto.tamanho) }}</span>
               <span>{{ formatCurrency(produto.preco) }}</span>
               <span class="status-chip" [class.inativa]="!produto.ativo">
                 {{ produto.ativo ? 'Ativo' : 'Inativo' }}
@@ -226,6 +240,15 @@ interface ProdutoFormModel {
               </label>
 
               <label>
+                Tamanho
+                <select name="tamanho" [(ngModel)]="form.tamanho">
+                  @for (tamanho of tamanhoOptions; track tamanho.id) {
+                    <option [value]="tamanho.id">{{ tamanho.label }}</option>
+                  }
+                </select>
+              </label>
+
+              <label>
                 Preço
                 <input
                   type="number"
@@ -269,9 +292,11 @@ export class CardapioPageComponent {
   }
 
   protected readonly categories = this.produtosService.categories;
+  protected readonly tamanhoOptions = this.produtosService.tamanhos;
   protected produtos = this.produtosService.getProdutos();
   protected search = '';
   protected categoryFilter: ProductCategory | 'todos' = 'todos';
+  protected sizeFilter: ProdutoTamanho | 'todos' = 'todos';
   protected statusFilter: ProdutoStatusFilter = 'todos';
   protected descriptionFilter: ProdutoDescriptionFilter = 'todos';
   protected sortOption: ProdutoSortOption = 'nome_az';
@@ -296,6 +321,10 @@ export class CardapioPageComponent {
 
     const filtered = this.produtos.filter((produto) => {
       if (this.categoryFilter !== 'todos' && produto.categoria !== this.categoryFilter) {
+        return false;
+      }
+
+      if (this.sizeFilter !== 'todos' && produto.tamanho !== this.sizeFilter) {
         return false;
       }
 
@@ -328,7 +357,7 @@ export class CardapioPageComponent {
         return true;
       }
 
-      const searchBase = this.normalizeText([produto.nome, produto.descricao, produto.categoria].join(' '));
+      const searchBase = this.normalizeText([produto.nome, produto.descricao, produto.categoria, this.getTamanhoLabel(produto.tamanho)].join(' '));
       return searchBase.includes(normalizedSearch);
     });
 
@@ -338,6 +367,7 @@ export class CardapioPageComponent {
   protected clearFilters(): void {
     this.search = '';
     this.categoryFilter = 'todos';
+    this.sizeFilter = 'todos';
     this.statusFilter = 'todos';
     this.descriptionFilter = 'todos';
     this.sortOption = 'nome_az';
@@ -408,6 +438,7 @@ export class CardapioPageComponent {
       nome: this.form.nome.trim(),
       descricao: this.form.descricao.trim(),
       categoria: this.form.categoria,
+      tamanho: this.form.tamanho,
       preco: this.form.preco,
       ativo: this.form.ativo,
     };
@@ -438,6 +469,7 @@ export class CardapioPageComponent {
       nome: produto.nome,
       descricao: produto.descricao,
       categoria: produto.categoria,
+      tamanho: produto.tamanho,
       preco: produto.preco,
       ativo: produto.ativo,
     };
@@ -454,6 +486,7 @@ export class CardapioPageComponent {
       nome: produto.nome,
       descricao: produto.descricao,
       categoria: produto.categoria,
+      tamanho: produto.tamanho,
       preco: produto.preco,
       ativo: !produto.ativo,
     });
@@ -489,6 +522,10 @@ export class CardapioPageComponent {
     }).format(value);
   }
 
+  protected getTamanhoLabel(tamanho?: ProdutoTamanho): string {
+    return this.tamanhoOptions.find((option) => option.id === tamanho)?.label ?? 'Médio';
+  }
+
   private refreshProdutos(): void {
     this.produtos = this.produtosService.getProdutos();
   }
@@ -504,6 +541,7 @@ export class CardapioPageComponent {
       nome: '',
       descricao: '',
       categoria: 'Lanches',
+      tamanho: 'medio',
       preco: null,
       ativo: true,
     };
@@ -527,10 +565,18 @@ export class CardapioPageComponent {
         return sorted.sort((a, b) =>
           a.categoria.localeCompare(b.categoria, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'),
         );
+      case 'tamanho':
+        return sorted.sort(
+          (a, b) => this.getTamanhoOrder(a.tamanho) - this.getTamanhoOrder(b.tamanho) || a.nome.localeCompare(b.nome, 'pt-BR'),
+        );
       case 'nome_az':
       default:
         return sorted.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     }
+  }
+
+  private getTamanhoOrder(tamanho?: ProdutoTamanho): number {
+    return this.tamanhoOptions.find((option) => option.id === tamanho)?.ordem ?? 4;
   }
 
   private normalizeText(value: string): string {

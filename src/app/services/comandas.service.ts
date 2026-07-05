@@ -3,6 +3,7 @@ import { Comanda, ItemComanda, MapaMesaCard, Mesa, ResumoComandas } from '../mod
 import { CaixaService } from './caixa.service';
 import { LocalStorageRepository } from './local-storage.repository';
 import { MesasService } from './mesas.service';
+import { ProdutosService } from './produtos.service';
 
 interface SaveComandaPayload {
   clienteId?: string;
@@ -16,6 +17,7 @@ interface SaveComandaPayload {
 export class ComandasService {
   private readonly caixaService = inject(CaixaService);
   private readonly mesasService = inject(MesasService);
+  private readonly produtosService = inject(ProdutosService);
 
   private readonly repository = new LocalStorageRepository<Comanda[]>(
     'aqui-comanda:open-comandas',
@@ -115,6 +117,8 @@ export class ComandasService {
     const updatedItems = this.normalizeItems(payload.items);
     const mesaId = payload.mesaId || undefined;
 
+    this.validateAndApplyStockDelta([], updatedItems);
+
     const comanda: Comanda = {
       id: `comanda-${mesaId ? `mesa-${mesaId}` : 'rapida'}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       mesaId,
@@ -154,6 +158,9 @@ export class ComandasService {
 
     const mesaId = payload.mesaId || undefined;
     const updatedItems = this.normalizeItems(payload.items);
+
+    this.validateAndApplyStockDelta(existingComanda.itens ?? [], updatedItems);
+
     const updatedComanda: Comanda = {
       ...existingComanda,
       mesaId,
@@ -191,6 +198,7 @@ export class ComandasService {
     }
 
     const updatedItems = this.normalizeItems(items);
+    this.validateAndApplyStockDelta(existingComanda.itens ?? [], updatedItems);
     const total = this.getItemsTotal(updatedItems);
     const updatedAt = new Date().toISOString();
 
@@ -267,6 +275,7 @@ export class ComandasService {
       return;
     }
 
+    this.validateAndApplyStockDelta(existingComanda.itens ?? [], []);
     this.comandas.set(this.comandas().filter((comanda) => comanda.id !== comandaId));
     this.persist();
   }
@@ -351,15 +360,80 @@ export class ComandasService {
   }
 
   private normalizeItems(items: ItemComanda[]): ItemComanda[] {
-    return items.map((item) => ({
-      ...item,
-      precoUnitario: item.precoUnitario ?? 0,
-      quantidade: item.quantidade ?? 0,
-      subtotal: (item.quantidade ?? 0) * (item.precoUnitario ?? 0),
-    }));
+    return items.map((item) => {
+      const produto = this.produtosService.getProdutoById(item.productId);
+      const quantidade = Number(item.quantidade) || 0;
+      const precoUnitario = Number(item.precoUnitario) || 0;
+      const unitCost = Number(item.unitCost ?? produto?.costPrice) || 0;
+
+      return {
+        ...item,
+        precoUnitario,
+        quantidade,
+        unitCost,
+        totalCost: quantidade * unitCost,
+        subtotal: quantidade * precoUnitario,
+      };
+    });
   }
 
   private getItemsTotal(items: ItemComanda[]): number {
     return items.reduce((total, item) => total + item.subtotal, 0);
+  }
+
+  private validateAndApplyStockDelta(previousItems: ItemComanda[], nextItems: ItemComanda[]): void {
+    const previousQuantities = this.getQuantitiesByProduct(previousItems);
+    const nextQuantities = this.getQuantitiesByProduct(nextItems);
+    const deltas = new Map<string, number>();
+
+    for (const productId of new Set([...previousQuantities.keys(), ...nextQuantities.keys()])) {
+      const previousQuantity = previousQuantities.get(productId) ?? 0;
+      const nextQuantity = nextQuantities.get(productId) ?? 0;
+      const reserveDelta = nextQuantity - previousQuantity;
+
+      if (reserveDelta === 0) {
+        continue;
+      }
+
+      const produto = this.produtosService.getProdutoById(productId);
+
+      if (!produto) {
+        throw new Error('Produto não encontrado no cadastro.');
+      }
+
+      if (reserveDelta > 0 && !this.produtosService.productControlsStock(produto)) {
+        if (!this.produtosService.isProductAvailable(produto)) {
+          throw new Error(this.produtosService.getProductUnavailableMessage(produto));
+        }
+
+        continue;
+      }
+
+      if (reserveDelta > 0 && !this.produtosService.isProductAvailable(produto)) {
+        throw new Error(this.produtosService.getProductUnavailableMessage(produto));
+      }
+
+      if (reserveDelta > 0 && produto.stockQuantity < reserveDelta) {
+        throw new Error(
+          produto.stockQuantity <= 0
+            ? 'Produto sem estoque disponível.'
+            : 'Quantidade solicitada maior que o estoque disponível.',
+        );
+      }
+
+      deltas.set(productId, -reserveDelta);
+    }
+
+    this.produtosService.applyStockDeltas(deltas);
+  }
+
+  private getQuantitiesByProduct(items: ItemComanda[]): Map<string, number> {
+    const quantities = new Map<string, number>();
+
+    for (const item of items) {
+      quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + (Number(item.quantidade) || 0));
+    }
+
+    return quantities;
   }
 }

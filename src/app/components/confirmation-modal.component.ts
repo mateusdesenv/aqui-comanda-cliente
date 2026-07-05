@@ -5,7 +5,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   standalone: true,
   template: `
     <div class="comanda-modal-overlay confirmation-modal-overlay" role="presentation">
-      <section class="system-confirmation-modal" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId">
+      <section class="system-confirmation-modal liquid-glass-modal" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId">
         <button class="modal-close-button" type="button" [attr.aria-label]="cancelLabel" (click)="cancel.emit()">
           X
         </button>

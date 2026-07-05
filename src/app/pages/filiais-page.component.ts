@@ -1,5 +1,6 @@
 import { Component, HostListener, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ConfirmationModalComponent } from '../components/confirmation-modal.component';
 import { Colaborador, Filial } from '../models/app-data';
 import { AuthService } from '../services/auth.service';
@@ -30,7 +31,7 @@ interface FilialFormModel {
       <section class="page-head">
         <div>
           <h1>Lojas / Filiais</h1>
-          <p>Cadastre unidades do estabelecimento e associe os colaboradores que trabalham em cada filial.</p>
+          <p>{{ hasFilialCadastrada ? 'Cadastre unidades do estabelecimento e associe os colaboradores que trabalham em cada filial.' : 'Cadastre sua primeira filial para começar a operar o sistema.' }}</p>
         </div>
       </section>
 
@@ -39,7 +40,28 @@ interface FilialFormModel {
       }
 
       @if (successMessage && !filialModalOpen) {
-        <div class="form-feedback success">{{ successMessage }}</div>
+        <div class="form-feedback success setup-success-feedback">
+          <span>{{ successMessage }}</span>
+          @if (hasFilialCadastrada) {
+            <button class="ghost-button" type="button" (click)="goToMapa()">Ir para o mapa de comandas</button>
+          }
+        </div>
+      }
+
+      @if (!hasFilialCadastrada) {
+        <section class="settings-card branch-info-card setup-required-card">
+          <div>
+            <strong>Cadastre sua primeira filial para começar a usar o sistema</strong>
+            @if (canWriteConfiguracoes) {
+              <p>Antes de abrir comandas, lançar pedidos ou movimentar o caixa, configure pelo menos uma filial ativa do estabelecimento.</p>
+            } @else {
+              <p>Nenhuma filial cadastrada. Solicite a um administrador para configurar a primeira filial do estabelecimento.</p>
+            }
+          </div>
+          @if (canWriteConfiguracoes) {
+            <button class="primary-action-button" type="button" (click)="openCreateModal()">Nova filial</button>
+          }
+        </section>
       }
 
       <section class="settings-card branch-info-card">
@@ -120,8 +142,11 @@ interface FilialFormModel {
             </article>
           } @empty {
             <div class="management-empty-state branches-empty-state">
-              <strong>Nenhuma filial cadastrada ainda.</strong>
-              <span>Use o botão Nova filial para criar a primeira unidade do estabelecimento.</span>
+              <strong>{{ hasFilialCadastrada ? 'Nenhuma filial cadastrada ainda.' : 'Cadastre sua primeira filial' }}</strong>
+              <span>{{ canWriteConfiguracoes ? 'Para começar a operar o Aqui Comanda, cadastre pelo menos uma filial ativa do seu estabelecimento.' : 'Nenhuma filial cadastrada. Solicite a um administrador para configurar a primeira filial do estabelecimento.' }}</span>
+              @if (canWriteConfiguracoes) {
+                <button class="primary-action-button" type="button" (click)="openCreateModal()">Nova filial</button>
+              }
             </div>
           }
         </div>
@@ -290,6 +315,7 @@ export class FiliaisPageComponent {
   private readonly colaboradoresService = inject(ColaboradoresService);
   private readonly authService = inject(AuthService);
   private readonly cepService = inject(CepService);
+  private readonly router = inject(Router);
 
   protected filiais = this.filiaisService.getFiliais();
   protected colaboradores = this.colaboradoresService.getColaboradores();
@@ -305,6 +331,10 @@ export class FiliaisPageComponent {
 
   protected get canWriteConfiguracoes(): boolean {
     return this.authService.canWrite('configuracoes');
+  }
+
+  protected get hasFilialCadastrada(): boolean {
+    return this.filiaisService.hasFilialCadastrada();
   }
 
   @HostListener('document:click')
@@ -422,12 +452,18 @@ export class FiliaisPageComponent {
       ativa: this.form.ativa,
     };
 
+    const setupWasBlocked = !this.filiaisService.hasFilialCadastrada();
+
     if (this.editingFilialId) {
       this.filiaisService.updateFilial(this.editingFilialId, payload);
-      this.successMessage = 'Filial atualizada com sucesso.';
+      this.successMessage = setupWasBlocked && payload.ativa
+        ? 'Filial ativada com sucesso. Agora você já pode operar o sistema.'
+        : 'Filial atualizada com sucesso.';
     } else {
       this.filiaisService.createFilial(payload);
-      this.successMessage = 'Filial cadastrada com sucesso.';
+      this.successMessage = setupWasBlocked && payload.ativa
+        ? 'Filial cadastrada com sucesso. Agora você já pode operar o sistema.'
+        : 'Filial cadastrada com sucesso.';
     }
 
     this.refreshFiliais();
@@ -514,6 +550,15 @@ export class FiliaisPageComponent {
     const cepTexto = cep ? ` · CEP ${cep}` : '';
 
     return `${primeiraLinha}${complementoTexto}${localidade ? ` · ${localidade}` : ''}${cepTexto}`;
+  }
+
+  protected goToMapa(): void {
+    if (!this.filiaisService.hasFilialCadastrada()) {
+      this.errorMessage = 'Cadastre ou ative uma filial antes de acessar o mapa de comandas.';
+      return;
+    }
+
+    this.router.navigateByUrl('/mapa');
   }
 
   protected formatDate(value: string): string {

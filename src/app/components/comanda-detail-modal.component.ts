@@ -5,18 +5,21 @@ import { Comanda, ItemComanda, Mesa, ProductCategory, Produto } from '../models/
 import { ComandasService } from '../services/comandas.service';
 import { CaixaService } from '../services/caixa.service';
 import { ProdutosService } from '../services/produtos.service';
+import { PrinterComandaService, type PrintComandaPayload } from '../services/printer-comanda.service';
+import { IconComponent } from './icon.component';
 
 type CategoryTab = ProductCategory | 'Todos';
 type MenuViewMode = 'grid' | 'lista';
+type StockFilterMode = 'in_stock' | 'all';
 
 @Component({
   selector: 'app-comanda-detail-modal',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, IconComponent],
   template: `
     <div class="comanda-modal-overlay" role="presentation">
       <section
-        class="comanda-modal"
+        class="comanda-modal mesa-detail-modal liquid-glass-modal"
         role="dialog"
         aria-modal="true"
         [attr.aria-labelledby]="'comanda-modal-title-' + mesa.id"
@@ -49,11 +52,6 @@ type MenuViewMode = 'grid' | 'lista';
             </span>
           </div>
 
-          <p>
-            Selecione uma comanda para lançar itens ou use o card de nova comanda para iniciar outro
-            consumo nesta mesa.
-          </p>
-
           @if (mesaComandas.length > 0) {
             <div class="mesa-release-action-bar">
               <div>
@@ -77,78 +75,84 @@ type MenuViewMode = 'grid' | 'lista';
         </header>
 
         @if (modalFeedback) {
-          <div class="quick-form-feedback success-feedback">{{ modalFeedback }}</div>
+          <div
+            class="quick-form-feedback"
+            [class.success-feedback]="modalFeedbackType === 'success'"
+          >
+            {{ modalFeedback }}
+          </div>
         }
 
-        <section class="mesa-comandas-cards-section" aria-label="Comandas da mesa">
-          <div class="mesa-comandas-card-grid" [class.empty-grid]="mesaComandas.length === 0">
-            @for (comanda of mesaComandas; track comanda.id) {
-              <button
-                class="mesa-comanda-card"
-                [class.active]="isSelectedComanda(comanda)"
-                [class.finalized]="isFinalized(comanda)"
-                type="button"
-                (click)="selectComanda(comanda)"
-              >
-                <div class="mesa-comanda-card-head">
-                  <strong>{{ getComandaCardTitle(comanda) }}</strong>
-                  <span class="mesa-comanda-status" [class.finalized]="isFinalized(comanda)">
-                    {{ getComandaStatusLabel(comanda) }}
-                  </span>
-                </div>
+        <div class="mesa-detail-body">
+          <section class="mesa-comandas-cards-section" aria-label="Comandas da mesa">
+            <div class="mesa-comandas-card-grid" [class.empty-grid]="mesaComandas.length === 0">
+              @for (comanda of mesaComandas; track comanda.id) {
+                <button
+                  class="mesa-comanda-card"
+                  [class.active]="isSelectedComanda(comanda)"
+                  [class.finalized]="isFinalized(comanda)"
+                  type="button"
+                  (click)="selectComanda(comanda)"
+                >
+                  <div class="mesa-comanda-card-head">
+                    <strong>{{ getComandaCardTitle(comanda) }}</strong>
+                    <span class="mesa-comanda-status" [class.finalized]="isFinalized(comanda)">
+                      {{ getComandaStatusLabel(comanda) }}
+                    </span>
+                  </div>
 
-                <span
-                  class="mesa-comanda-client"
-                  [class.registered-client-name]="isRegisteredClienteComanda(comanda)"
-                >{{
-                  comanda.clienteNome || 'Cliente não informado'
-                }}</span>
-
-                <div class="mesa-comanda-card-meta">
                   <span
-                    >{{ comanda.itens.length }} item{{
-                      comanda.itens.length === 1 ? '' : 's'
-                    }}</span
-                  >
-                  <strong>{{ formatCurrency(getComandaTotal(comanda)) }}</strong>
-                </div>
+                    class="mesa-comanda-client"
+                    [class.registered-client-name]="isRegisteredClienteComanda(comanda)"
+                  >{{
+                    comanda.clienteNome || 'Cliente não informado'
+                  }}</span>
 
-                <small>Criada em {{ formatDateTime(comanda.createdAt) }}</small>
-              </button>
-            }
+                  <div class="mesa-comanda-card-meta">
+                    <span
+                      >{{ comanda.itens.length }} item{{
+                        comanda.itens.length === 1 ? '' : 's'
+                      }}</span
+                    >
+                    <strong>{{ formatCurrency(getComandaTotal(comanda)) }}</strong>
+                  </div>
 
-            @if (canWrite) {
-              <button
-                class="mesa-add-comanda-card"
-                type="button"
-                aria-label="Adicionar nova comanda para esta mesa"
-                (click)="createComandaForMesa()"
-              >
-                <span aria-hidden="true">+</span>
-                <strong>Nova comanda</strong>
-              </button>
-            } @else if (mesaComandas.length === 0) {
-              <article class="mesa-readonly-empty-card">
-                <strong>Nenhuma comanda nesta mesa</strong>
-                <span>Você tem permissão apenas para visualizar.</span>
-              </article>
-            }
-          </div>
-        </section>
+                  <small>Criada em {{ formatDateTime(comanda.createdAt) }}</small>
+                </button>
+              }
 
-        @if (selectedComanda; as activeComanda) {
-          @if (isFinalized(activeComanda)) {
-            <div class="readonly-comanda-alert">
-              <strong>Comanda paga/finalizada</strong>
-              <span
-                >Esta comanda está bloqueada para novos itens. Para o mesmo cliente consumir
-                novamente, crie uma nova comanda para esta mesa.</span
-              >
+              @if (canWrite) {
+                <button
+                  class="mesa-add-comanda-card"
+                  type="button"
+                  aria-label="Adicionar nova comanda para esta mesa"
+                  (click)="createComandaForMesa()"
+                >
+                  <span aria-hidden="true">+</span>
+                  <strong>Nova comanda</strong>
+                </button>
+              } @else if (mesaComandas.length === 0) {
+                <article class="mesa-readonly-empty-card">
+                  <strong>Nenhuma comanda nesta mesa</strong>
+                  <span>Você tem permissão apenas para visualizar.</span>
+                </article>
+              }
             </div>
-          }
+          </section>
 
-          <div class="comanda-detail-grid">
-            <section class="detail-panel menu-panel" aria-label="Cardápio">
+          @if (selectedComanda; as activeComanda) {
+            @if (isFinalized(activeComanda)) {
+              <div class="readonly-comanda-alert">
+                <strong>Comanda paga/finalizada</strong>
+                <span
+                  >Esta comanda está bloqueada para novos itens. Para o mesmo cliente consumir
+                  novamente, crie uma nova comanda para esta mesa.</span
+                >
+              </div>
+            }
+
+            <div class="comanda-detail-grid">
+              <section class="detail-panel menu-panel" aria-label="Cardápio">
               <div class="detail-panel-header menu-panel-toolbar">
                 <div>
                   <h3>Cardápio</h3>
@@ -173,6 +177,17 @@ type MenuViewMode = 'grid' | 'lista';
               </div>
 
               @if (activeProducts.length > 0) {
+                <label class="quick-product-search mesa-product-search">
+                  Buscar produto
+                  <input
+                    type="search"
+                    name="mesaProductSearch"
+                    placeholder="Digite nome, descrição ou categoria"
+                    [(ngModel)]="productSearch"
+                    (ngModelChange)="clearProductFiltersFeedback()"
+                  />
+                </label>
+
                 <div class="category-tabs" role="tablist" aria-label="Categorias do cardápio">
                   @for (category of categories; track category) {
                     <button
@@ -188,15 +203,38 @@ type MenuViewMode = 'grid' | 'lista';
                   }
                 </div>
 
+                <div class="stock-filter-row">
+                  <div class="view-toggle stock-filter-toggle" role="group" aria-label="Filtro de estoque">
+                    <button
+                      type="button"
+                      [class.active]="stockFilterMode === 'in_stock'"
+                      (click)="setStockFilterMode('in_stock')"
+                    >
+                      Em estoque
+                    </button>
+                    <button
+                      type="button"
+                      [class.active]="stockFilterMode === 'all'"
+                      (click)="setStockFilterMode('all')"
+                    >
+                      Todos
+                    </button>
+                  </div>
+                </div>
+
                 <div class="product-grid" [class.product-list-view]="menuViewMode === 'lista'">
                   @for (produto of filteredProducts; track produto.id) {
                     <article
                       class="product-card"
-                      [class.product-card-disabled]="!canEditSelectedComanda"
+                      [class.product-card-disabled]="!canEditSelectedComanda || !hasProductStock(produto)"
                     >
                       <div>
                         <strong>{{ produto.nome }}</strong>
                         <p>{{ produto.descricao }}</p>
+                        <span class="product-size-chip quick-product-size">{{ getProdutoTamanhoLabel(produto) }}</span>
+                        <span class="stock-availability-chip" [class.out]="!hasProductStock(produto)">
+                          {{ getStockBadgeLabel(produto) }}
+                        </span>
                       </div>
 
                       <span class="product-price">{{ formatCurrency(produto.preco) }}</span>
@@ -218,7 +256,7 @@ type MenuViewMode = 'grid' | 'lista';
                           <button
                             type="button"
                             aria-label="Aumentar quantidade"
-                            [disabled]="!canEditSelectedComanda"
+                            [disabled]="!canEditSelectedComanda || !canIncreaseProduct(produto)"
                             (click)="incrementQuantity(produto)"
                           >
                             +
@@ -228,13 +266,18 @@ type MenuViewMode = 'grid' | 'lista';
                         <button
                           class="add-product-button"
                           type="button"
-                          [disabled]="!canEditSelectedComanda"
+                          [disabled]="!canEditSelectedComanda || !canAddProduct(produto)"
                           (click)="addItem(produto)"
                         >
-                          Adicionar
-                        </button>
-                      </div>
-                    </article>
+                        {{ getAddProductLabel(produto) }}
+                      </button>
+                    </div>
+                  </article>
+                  } @empty {
+                    <div class="empty-menu-category">
+                      <strong>{{ emptyProductsTitle }}</strong>
+                      <span>{{ emptyProductsDescription }}</span>
+                    </div>
                   }
                 </div>
               } @else {
@@ -244,12 +287,21 @@ type MenuViewMode = 'grid' | 'lista';
                   <a routerLink="/cardapio" (click)="close.emit()">Cadastrar produto</a>
                 </div>
               }
-            </section>
+              </section>
 
-            <section class="detail-panel order-panel" aria-label="Itens lançados">
+              <section class="detail-panel order-panel" aria-label="Itens lançados">
               <div class="detail-panel-header order-header">
                 <h3>Itens da comanda</h3>
                 <div class="order-header-actions">
+                  <button
+                    class="print-comanda-button"
+                    type="button"
+                    [disabled]="isPrintingComanda"
+                    (click)="printSelectedComanda(activeComanda)"
+                  >
+                    <app-icon name="printer" [size]="16" />
+                    {{ isPrintingComanda ? 'Imprimindo...' : 'Imprimir comanda' }}
+                  </button>
                   @if (canEditSelectedComanda && items.length > 0) {
                     <button
                       class="finish-comanda-button"
@@ -342,9 +394,10 @@ type MenuViewMode = 'grid' | 'lista';
                   <small>Finalizada em {{ formatDateTime(finalizadaEm) }}</small>
                 }
               </footer>
-            </section>
-          </div>
-        }
+              </section>
+            </div>
+          }
+        </div>
       </section>
 
       @if (finishCandidate) {
@@ -454,15 +507,19 @@ export class ComandaDetailModalComponent implements OnChanges {
   private readonly comandasService = inject(ComandasService);
   private readonly caixaService = inject(CaixaService);
   private readonly produtosService = inject(ProdutosService);
+  private readonly printerComandaService = inject(PrinterComandaService);
 
   protected activeCategory: CategoryTab = 'Todos';
   protected menuViewMode: MenuViewMode = 'grid';
+  protected stockFilterMode: StockFilterMode = 'in_stock';
+  protected productSearch = '';
   protected selectedComandaId = '';
   protected items: ItemComanda[] = [];
-  protected productQuantities: Record<string, number> = {};
   protected finishCandidate: Comanda | null = null;
   protected releaseMesaConfirmationOpen = false;
   protected modalFeedback = '';
+  protected modalFeedbackType: 'success' | 'error' = 'success';
+  protected isPrintingComanda = false;
 
   ngOnChanges(): void {
     const mesaChanged = this.mesa.id !== this.lastMesaId;
@@ -473,14 +530,6 @@ export class ComandaDetailModalComponent implements OnChanges {
     }
 
     this.syncSelectedComandaItems();
-
-    this.productQuantities = this.activeProducts.reduce<Record<string, number>>(
-      (quantities, produto) => {
-        quantities[produto.id] = this.productQuantities[produto.id] ?? 1;
-        return quantities;
-      },
-      {},
-    );
 
     if (!this.categories.includes(this.activeCategory)) {
       this.activeCategory = 'Todos';
@@ -520,11 +569,29 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected get filteredProducts(): Produto[] {
-    if (this.activeCategory === 'Todos') {
-      return this.activeProducts;
-    }
+    return this.getFilteredProducts();
+  }
 
-    return this.activeProducts.filter((produto) => produto.categoria === this.activeCategory);
+  protected get emptyProductsTitle(): string {
+    return this.produtosService.normalizeText(this.productSearch)
+      ? 'Nenhum produto encontrado para essa busca'
+      : 'Nenhum produto encontrado';
+  }
+
+  protected get emptyProductsDescription(): string {
+    return 'Ajuste a busca, categoria ou filtro de estoque selecionado.';
+  }
+
+  private getFilteredProducts(): Produto[] {
+    return this.activeProducts.filter((produto) => {
+      const matchesCategory =
+        this.activeCategory === 'Todos' || produto.categoria === this.activeCategory;
+      const matchesSearch = this.produtosService.productMatchesSearch(produto, this.productSearch);
+      const matchesStockFilter =
+        this.stockFilterMode === 'all' || this.isProductAvailable(produto);
+
+      return matchesCategory && matchesSearch && matchesStockFilter;
+    });
   }
 
   protected get displayMesaNumber(): string {
@@ -575,6 +642,15 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.menuViewMode = mode;
   }
 
+  protected setStockFilterMode(mode: StockFilterMode): void {
+    this.stockFilterMode = mode;
+    this.modalFeedback = '';
+  }
+
+  protected clearProductFiltersFeedback(): void {
+    this.modalFeedback = '';
+  }
+
   protected selectComanda(comanda: Comanda): void {
     this.selectedComandaId = comanda.id;
     this.syncSelectedComandaItems();
@@ -593,18 +669,25 @@ export class ComandaDetailModalComponent implements OnChanges {
   }
 
   protected getQuantity(produto: Produto): number {
-    return this.productQuantities[produto.id] ?? 1;
+    return this.getSelectedQuantity(produto);
   }
 
   protected incrementQuantity(produto: Produto): void {
-    if (!this.canEditSelectedComanda) {
+    if (!this.canEditSelectedComanda || !this.canIncreaseProduct(produto)) {
+      if (this.canEditSelectedComanda) {
+        this.showModalFeedback(this.getStockErrorMessage(produto), 'error');
+      }
       return;
     }
 
-    this.productQuantities = {
-      ...this.productQuantities,
-      [produto.id]: this.getQuantity(produto) + 1,
-    };
+    const existingItem = this.items.find((item) => item.productId === produto.id);
+
+    if (existingItem) {
+      this.changeItemQuantity(existingItem, existingItem.quantidade + 1);
+      return;
+    }
+
+    this.addProductWithQuantity(produto, 1);
   }
 
   protected decrementQuantity(produto: Produto): void {
@@ -612,10 +695,13 @@ export class ComandaDetailModalComponent implements OnChanges {
       return;
     }
 
-    this.productQuantities = {
-      ...this.productQuantities,
-      [produto.id]: Math.max(this.getQuantity(produto) - 1, 0),
-    };
+    const existingItem = this.items.find((item) => item.productId === produto.id);
+
+    if (!existingItem) {
+      return;
+    }
+
+    this.changeItemQuantity(existingItem, existingItem.quantidade - 1);
   }
 
   protected addItem(produto: Produto): void {
@@ -623,22 +709,33 @@ export class ComandaDetailModalComponent implements OnChanges {
       return;
     }
 
-    const quantidade = Math.max(this.getQuantity(produto), 1);
-    const existingItem = this.items.find((item) => item.productId === produto.id);
-
-    if (existingItem) {
-      this.changeItemQuantity(existingItem, existingItem.quantidade + quantidade);
+    if (!this.canAddProduct(produto)) {
+      this.showModalFeedback(this.getStockErrorMessage(produto), 'error');
       return;
     }
 
+    const existingItem = this.items.find((item) => item.productId === produto.id);
+
+    if (existingItem) {
+      this.changeItemQuantity(existingItem, existingItem.quantidade + 1);
+      return;
+    }
+
+    this.addProductWithQuantity(produto, 1);
+  }
+
+  private addProductWithQuantity(produto: Produto, quantidade: number): void {
     this.items = [
       ...this.items,
       {
         id: `${produto.id}-${Date.now()}`,
         productId: produto.id,
         nome: produto.nome,
+        tamanho: produto.tamanho,
         quantidade,
         precoUnitario: produto.preco,
+        unitCost: produto.costPrice,
+        totalCost: quantidade * produto.costPrice,
         subtotal: quantidade * produto.preco,
       },
     ];
@@ -655,11 +752,23 @@ export class ComandaDetailModalComponent implements OnChanges {
       return;
     }
 
+    const produto = this.activeProducts.find((currentProduto) => currentProduto.id === itemToChange.productId);
+
+    if (
+      produto &&
+      this.produtosService.productControlsStock(produto) &&
+      nextQuantity > this.getProductTotalStock(produto)
+    ) {
+      this.showModalFeedback('Quantidade solicitada maior que o estoque disponível.', 'error');
+      return;
+    }
+
     this.items = this.items.map((item) =>
       item.id === itemToChange.id
         ? {
             ...item,
             quantidade: nextQuantity,
+            totalCost: nextQuantity * (item.unitCost ?? 0),
             subtotal: nextQuantity * item.precoUnitario,
           }
         : item,
@@ -693,11 +802,13 @@ export class ComandaDetailModalComponent implements OnChanges {
       this.selectedComandaId = '';
       this.items = [];
       this.modalFeedback = '';
+      this.modalFeedbackType = 'success';
       return;
     }
 
     this.items = selected.itens.map((item) => ({ ...item }));
     this.modalFeedback = '';
+    this.modalFeedbackType = 'success';
   }
 
   protected getComandaLabel(comanda: Comanda | null): string {
@@ -735,6 +846,36 @@ export class ComandaDetailModalComponent implements OnChanges {
     return Boolean(comanda?.clienteId);
   }
 
+  protected printSelectedComanda(comanda: Comanda): void {
+    if (this.isPrintingComanda) {
+      return;
+    }
+
+    const printableItems = this.items.length > 0 ? this.items : comanda.itens;
+
+    if (printableItems.length === 0) {
+      this.showModalFeedback('Não há itens para imprimir nesta comanda.', 'error');
+      return;
+    }
+
+    this.isPrintingComanda = true;
+    this.modalFeedback = '';
+
+    this.printerComandaService.printComanda(this.buildPrintPayload(comanda, printableItems)).subscribe({
+      next: () => {
+        this.isPrintingComanda = false;
+        this.showModalFeedback('Comanda enviada para impressão com sucesso.', 'success');
+      },
+      error: () => {
+        this.isPrintingComanda = false;
+        this.showModalFeedback(
+          'Não foi possível imprimir a comanda. Verifique se a API local de impressão está aberta e se a impressora está configurada.',
+          'error',
+        );
+      },
+    });
+  }
+
 
   protected openFinishConfirmation(comanda: Comanda): void {
     if (!this.canEditSelectedComanda || this.items.length === 0) {
@@ -759,7 +900,7 @@ export class ComandaDetailModalComponent implements OnChanges {
 
     if (!this.caixaService.hasCaixaAberto()) {
       this.finishCandidate = null;
-      this.modalFeedback = 'Abra o caixa antes de registrar pagamentos.';
+      this.showModalFeedback('Abra o caixa antes de registrar pagamentos.', 'error');
       return;
     }
 
@@ -767,15 +908,20 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.finishCandidate = null;
 
     if (!finalized) {
-      this.modalFeedback =
-        'Não foi possível finalizar esta comanda. Verifique se ela ainda está aberta e possui itens.';
+      this.showModalFeedback(
+        'Não foi possível finalizar esta comanda. Verifique se ela ainda está aberta e possui itens.',
+        'error',
+      );
       this.syncSelectedComandaItems();
       return;
     }
 
     this.selectedComandaId = finalized.id;
     this.items = finalized.itens.map((item) => ({ ...item }));
-    this.modalFeedback = `Comanda de ${finalized.clienteNome ?? 'cliente'} finalizada, marcada como paga e registrada no caixa.`;
+    this.showModalFeedback(
+      `Comanda de ${finalized.clienteNome ?? 'cliente'} finalizada, marcada como paga e registrada no caixa.`,
+      'success',
+    );
   }
 
   protected openReleaseMesaConfirmation(): void {
@@ -799,19 +945,28 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.releaseMesaConfirmationOpen = false;
 
     if (!released) {
-      this.modalFeedback =
-        'Não foi possível liberar a mesa. Verifique se todas as comandas estão pagas.';
+      this.showModalFeedback(
+        'Não foi possível liberar a mesa. Verifique se todas as comandas estão pagas.',
+        'error',
+      );
       return;
     }
 
     this.selectedComandaId = '';
     this.items = [];
     this.finishCandidate = null;
-    this.modalFeedback = 'Mesa liberada para um novo atendimento. O histórico pago foi preservado.';
+    this.showModalFeedback(
+      'Mesa liberada para um novo atendimento. O histórico pago foi preservado.',
+      'success',
+    );
   }
 
   protected getTotal(): number {
     return this.items.reduce((total, item) => total + item.subtotal, 0);
+  }
+
+  protected getProdutoTamanhoLabel(produto: Produto): string {
+    return this.produtosService.getTamanhoLabel(produto.tamanho);
   }
 
   protected formatCurrency(valor: number): string {
@@ -847,7 +1002,16 @@ export class ComandaDetailModalComponent implements OnChanges {
     }
 
     const currentId = this.selectedComandaId;
-    this.comandasService.saveItemsForComanda(currentId, this.items);
+    try {
+      this.comandasService.saveItemsForComanda(currentId, this.items);
+    } catch (error) {
+      this.showModalFeedback(
+        error instanceof Error ? error.message : 'Produto sem estoque disponível.',
+        'error',
+      );
+      this.syncSelectedComandaItems();
+      return;
+    }
 
     if (
       !this.comandasService
@@ -856,5 +1020,134 @@ export class ComandaDetailModalComponent implements OnChanges {
     ) {
       this.selectedComandaId = '';
     }
+  }
+
+  private buildPrintPayload(comanda: Comanda, items: ItemComanda[]): PrintComandaPayload {
+    const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    return {
+      comandaId: comanda.id,
+      comandaNumero: this.getComandaCardTitle(comanda).replace('Comanda ', ''),
+      mesaNumero: this.displayMesaNumber,
+      clienteNome: comanda.clienteManual ? undefined : (comanda.clienteNome || undefined),
+      clienteAvulsoNome: comanda.clienteManual ? (comanda.clienteNome || undefined) : undefined,
+      openedAt: comanda.createdAt,
+      printedAt: new Date().toISOString(),
+      items: items.map((item) => ({
+        produtoId: item.productId,
+        nome: item.nome,
+        quantidade: item.quantidade,
+        valorUnitario: item.precoUnitario,
+        valorTotal: item.subtotal,
+        categoria: this.getItemCategory(item),
+      })),
+      subtotal: total,
+      total,
+    };
+  }
+
+  private getItemCategory(item: ItemComanda): ProductCategory | undefined {
+    return this.activeProducts.find((produto) => produto.id === item.productId)?.categoria;
+  }
+
+  private showModalFeedback(message: string, type: 'success' | 'error'): void {
+    this.modalFeedback = message;
+    this.modalFeedbackType = type;
+  }
+
+  protected hasProductStock(produto: Produto): boolean {
+    return this.isProductAvailable(produto);
+  }
+
+  protected canIncreaseProduct(produto: Produto): boolean {
+    if (!this.isProductAvailable(produto)) {
+      return false;
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return true;
+    }
+
+    return this.getRemainingStock(produto) > 0;
+  }
+
+  protected canAddProduct(produto: Produto): boolean {
+    if (!this.isProductAvailable(produto)) {
+      return false;
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return true;
+    }
+
+    return this.getRemainingStock(produto) > 0;
+  }
+
+  protected getStockBadgeLabel(produto: Produto): string {
+    if (!this.produtosService.productControlsStock(produto)) {
+      return 'Disponível';
+    }
+
+    const totalStock = this.getProductTotalStock(produto);
+
+    if (totalStock <= 0) {
+      return 'Sem estoque';
+    }
+
+    return `Estoque: ${totalStock} · Selecionado: ${this.getSelectedQuantity(produto)} · Disponível: ${this.getRemainingStock(produto)}`;
+  }
+
+  protected getAddProductLabel(produto: Produto): string {
+    if (!this.isProductAvailable(produto)) {
+      return 'Sem estoque';
+    }
+
+    if (this.produtosService.productControlsStock(produto) && !this.canAddProduct(produto)) {
+      return 'Limite atingido';
+    }
+
+    return this.getSelectedQuantity(produto) > 0 ? 'Adicionar mais' : 'Adicionar';
+  }
+
+  private getStockErrorMessage(produto: Produto): string {
+    if (!produto.ativo) {
+      return 'Produto inativo.';
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return '';
+    }
+
+    return this.getProductTotalStock(produto) <= 0
+      ? 'Produto sem estoque disponível.'
+      : 'Quantidade solicitada maior que o estoque disponível.';
+  }
+
+  private getSelectedQuantity(produto: Produto): number {
+    return this.items.find((item) => item.productId === produto.id)?.quantidade ?? 0;
+  }
+
+  private getProductTotalStock(produto: Produto): number {
+    return (Number(produto.stockQuantity) || 0) + this.getSelectedQuantity(produto);
+  }
+
+  private getRemainingStock(produto: Produto): number {
+    if (!this.produtosService.productControlsStock(produto)) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    return Math.max(0, Number(produto.stockQuantity) || 0);
+  }
+
+  private isProductAvailable(produto: Produto): boolean {
+    if (!produto.ativo) {
+      return false;
+    }
+
+    if (!this.produtosService.productControlsStock(produto)) {
+      return true;
+    }
+
+    return this.getProductTotalStock(produto) > 0;
   }
 }
