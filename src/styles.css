@@ -106,7 +106,13 @@ img {
   grid-template-columns: minmax(520px, 1fr) minmax(420px, 0.82fr);
   background:
     radial-gradient(circle at 72% 18%, rgba(195, 124, 34, 0.08), transparent 28%),
-    linear-gradient(135deg, var(--cd-green-950) 0%, var(--cd-green-900) 45%, var(--cd-bg) 45.05%, var(--cd-bg) 100%);
+    linear-gradient(
+      135deg,
+      var(--cd-green-950) 0%,
+      var(--cd-green-900) 45%,
+      var(--cd-bg) 45.05%,
+      var(--cd-bg) 100%
+    );
   overflow: hidden;
 }
 
@@ -293,10 +299,30 @@ img {
   inset: 22% -10% 4% 20%;
   opacity: 0.15;
   background:
-    linear-gradient(90deg, transparent 0 30%, rgba(255, 255, 255, 0.75) 30.3% 31%, transparent 31.2%),
-    linear-gradient(0deg, transparent 0 78%, rgba(255, 255, 255, 0.75) 78.3% 79%, transparent 79.2%),
-    radial-gradient(circle at 73% 23%, transparent 0 40px, rgba(255, 255, 255, 0.65) 41px 45px, transparent 46px),
-    linear-gradient(135deg, transparent 0 48%, rgba(255, 255, 255, 0.55) 48.4% 49%, transparent 49.5%);
+    linear-gradient(
+      90deg,
+      transparent 0 30%,
+      rgba(255, 255, 255, 0.75) 30.3% 31%,
+      transparent 31.2%
+    ),
+    linear-gradient(
+      0deg,
+      transparent 0 78%,
+      rgba(255, 255, 255, 0.75) 78.3% 79%,
+      transparent 79.2%
+    ),
+    radial-gradient(
+      circle at 73% 23%,
+      transparent 0 40px,
+      rgba(255, 255, 255, 0.65) 41px 45px,
+      transparent 46px
+    ),
+    linear-gradient(
+      135deg,
+      transparent 0 48%,
+      rgba(255, 255, 255, 0.55) 48.4% 49%,
+      transparent 49.5%
+    );
 }
 
 .glass-card {
@@ -333,7 +359,9 @@ img {
   height: 2px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 6px rgba(255, 255, 255, 0.72), 0 12px rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 6px rgba(255, 255, 255, 0.72),
+    0 12px rgba(255, 255, 255, 0.72);
 }
 
 .dots {
@@ -376,10 +404,18 @@ img {
   background: var(--cd-text-disabled);
 }
 
-.status-dot.success { background: #38c172; }
-.status-dot.warning { background: var(--cd-amber-500); }
-.status-dot.info { background: var(--cd-info); }
-.status-dot.muted { background: var(--cd-green-300); }
+.status-dot.success {
+  background: #38c172;
+}
+.status-dot.warning {
+  background: var(--cd-amber-500);
+}
+.status-dot.info {
+  background: var(--cd-info);
+}
+.status-dot.muted {
+  background: var(--cd-green-300);
+}
 
 .order-card {
   position: absolute;
@@ -434,8 +470,7 @@ img {
   padding: clamp(24px, 4vw, 72px);
   background:
     radial-gradient(circle at 80% 18%, rgba(195, 124, 34, 0.1), transparent 26%),
-    radial-gradient(circle at 14% 82%, rgba(47, 83, 65, 0.08), transparent 32%),
-    var(--cd-bg);
+    radial-gradient(circle at 14% 82%, rgba(47, 83, 65, 0.08), transparent 32%), var(--cd-bg);
 }
 
 .ambient {
@@ -820,7 +855,6 @@ img {
   border: 1px solid transparent;
 }
 
-
 .sidebar-tree {
   display: grid;
   gap: 7px;
@@ -848,7 +882,9 @@ img {
   display: grid;
   place-items: center;
   color: rgba(255, 255, 255, 0.62);
-  transition: transform 160ms ease, color 160ms ease;
+  transition:
+    transform 160ms ease,
+    color 160ms ease;
 }
 
 .sidebar-link-group.expanded .sidebar-link-chevron {
@@ -1034,8 +1070,7 @@ img {
   padding: clamp(26px, 3.3vw, 48px);
   background:
     radial-gradient(circle at 96% 8%, rgba(195, 124, 34, 0.09), transparent 24%),
-    radial-gradient(circle at 10% 90%, rgba(47, 83, 65, 0.06), transparent 28%),
-    var(--cd-bg);
+    radial-gradient(circle at 10% 90%, rgba(47, 83, 65, 0.06), transparent 28%), var(--cd-bg);
 }
 
 .page-stack {
@@ -1251,8 +1286,7 @@ img {
   border-color: rgba(58, 112, 115, 0.38);
   color: var(--cd-info);
   background:
-    linear-gradient(180deg, rgba(232, 243, 242, 0.88), rgba(255, 255, 255, 0.92)),
-    var(--cd-info-bg);
+    linear-gradient(180deg, rgba(232, 243, 242, 0.88), rgba(255, 255, 255, 0.92)), var(--cd-info-bg);
 }
 
 .comanda-card.occupied {
@@ -1425,8 +1459,7 @@ img {
   border-radius: 24px;
   background:
     radial-gradient(circle at 92% 0%, rgba(195, 124, 34, 0.12), transparent 24%),
-    radial-gradient(circle at 5% 100%, rgba(47, 83, 65, 0.08), transparent 28%),
-    var(--cd-bg);
+    radial-gradient(circle at 5% 100%, rgba(47, 83, 65, 0.08), transparent 28%), var(--cd-bg);
   box-shadow: 0 32px 90px rgba(18, 32, 25, 0.38);
 }
 
@@ -1839,8 +1872,6 @@ img {
   line-height: 1;
 }
 
-
-
 .inline-quantity-control {
   width: 92px;
   height: 34px;
@@ -1910,8 +1941,7 @@ img {
   border: 1px dashed var(--cd-border-strong);
   border-radius: 20px;
   background:
-    radial-gradient(circle at 92% 18%, rgba(36, 102, 68, 0.12), transparent 32%),
-    var(--cd-bg-soft);
+    radial-gradient(circle at 92% 18%, rgba(36, 102, 68, 0.12), transparent 32%), var(--cd-bg-soft);
 }
 
 .mesa-empty-state strong,
@@ -2264,8 +2294,7 @@ img {
     grid-template-columns: 1fr;
   }
 
-  
-.management-grid {
+  .management-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2507,7 +2536,6 @@ img {
   }
 }
 
-
 app-root {
   display: block;
 }
@@ -2656,7 +2684,6 @@ body {
 .comandas-grid,
 .product-grid,
 .comanda-detail-grid,
-
 .management-grid {
   gap: var(--ui-grid-gap);
 }
@@ -3142,9 +3169,8 @@ body {
   font-weight: 900;
 }
 
-
 select,
-input[type="date"] {
+input[type='date'] {
   -webkit-appearance: none;
   appearance: none;
   min-height: 48px;
@@ -3164,27 +3190,29 @@ select {
   background-position:
     calc(100% - 20px) 50%,
     calc(100% - 14px) 50% !important;
-  background-size: 6px 6px, 6px 6px !important;
+  background-size:
+    6px 6px,
+    6px 6px !important;
   background-repeat: no-repeat !important;
 }
 
-input[type="date"] {
+input[type='date'] {
   padding-right: 14px;
   color-scheme: light;
 }
 
-input[type="date"]::-webkit-date-and-time-value {
+input[type='date']::-webkit-date-and-time-value {
   min-height: 1.2em;
   text-align: left;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type='date']::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.76;
 }
 
-input[type="date"]::-webkit-inner-spin-button,
-input[type="date"]::-webkit-clear-button {
+input[type='date']::-webkit-inner-spin-button,
+input[type='date']::-webkit-clear-button {
   display: none;
 }
 
@@ -3981,7 +4009,10 @@ button:disabled,
 
 .colaboradores-table .management-table-head,
 .colaboradores-table .management-table-row {
-  grid-template-columns: minmax(160px, 1fr) minmax(120px, 0.8fr) minmax(100px, 0.65fr) minmax(92px, 0.55fr) minmax(140px, 0.8fr) minmax(210px, 1.1fr);
+  grid-template-columns: minmax(160px, 1fr) minmax(120px, 0.8fr) minmax(100px, 0.65fr) minmax(
+      92px,
+      0.55fr
+    ) minmax(140px, 0.8fr) minmax(210px, 1.1fr);
 }
 
 .colaboradores-actions {
@@ -4517,8 +4548,7 @@ button:disabled {
 
 .mesa-comanda-card.active {
   background:
-    radial-gradient(circle at 92% 14%, rgba(195, 124, 34, 0.14), transparent 32%),
-    var(--cd-surface);
+    radial-gradient(circle at 92% 14%, rgba(195, 124, 34, 0.14), transparent 32%), var(--cd-surface);
 }
 
 .mesa-comanda-card.finalized {
@@ -4587,8 +4617,7 @@ button:disabled {
   border: 1px dashed rgba(195, 124, 34, 0.52);
   color: var(--cd-green-900);
   background:
-    radial-gradient(circle at 50% 18%, rgba(195, 124, 34, 0.16), transparent 42%),
-    var(--cd-bg-soft);
+    radial-gradient(circle at 50% 18%, rgba(195, 124, 34, 0.16), transparent 42%), var(--cd-bg-soft);
   text-align: center;
 }
 
@@ -4792,8 +4821,7 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.52);
   border-radius: 24px;
   background:
-    radial-gradient(circle at 92% 0%, rgba(195, 124, 34, 0.12), transparent 24%),
-    var(--cd-bg);
+    radial-gradient(circle at 92% 0%, rgba(195, 124, 34, 0.12), transparent 24%), var(--cd-bg);
   box-shadow: 0 32px 90px rgba(18, 32, 25, 0.38);
 }
 
@@ -5180,7 +5208,10 @@ select,
   line-height: 1.2;
   -webkit-appearance: none;
   appearance: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
 }
 
 select:hover:not(:disabled),
@@ -5207,7 +5238,9 @@ select:focus,
 .pedido-form-grid select:focus,
 .caixa-filters select:focus {
   border-color: var(--cd-amber-500);
-  box-shadow: 0 0 0 4px rgba(195, 124, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 0 0 4px rgba(195, 124, 34, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 select:disabled,
@@ -5365,8 +5398,7 @@ select:disabled,
 .menu-order-item.drag-over {
   border-color: var(--cd-amber-500);
   background:
-    radial-gradient(circle at 100% 0%, rgba(195, 124, 34, 0.1), transparent 30%),
-    var(--cd-amber-50);
+    radial-gradient(circle at 100% 0%, rgba(195, 124, 34, 0.1), transparent 30%), var(--cd-amber-50);
 }
 
 .menu-order-item.readonly {
@@ -6270,7 +6302,7 @@ select:disabled,
   outline: none;
   color: var(--cd-text);
   background: var(--cd-surface);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.5;
@@ -6846,60 +6878,9 @@ select:disabled,
   line-height: 1.45;
 }
 
-.client-mode-cards {
+.smart-client-field {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.client-mode-option {
-  min-height: 92px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--cd-border);
-  border-radius: 18px;
-  color: var(--cd-text);
-  background: var(--cd-bg-soft);
-  cursor: pointer;
-  transition: 180ms ease;
-}
-
-.client-mode-option:hover,
-.client-mode-option.active {
-  border-color: rgba(195, 124, 34, 0.34);
-  background: var(--cd-surface);
-  box-shadow: 0 14px 34px rgba(22, 23, 23, 0.08);
-  transform: translateY(-1px);
-}
-
-.client-mode-option.active {
-  outline: 3px solid rgba(195, 124, 34, 0.12);
-}
-
-.client-mode-option input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--cd-amber-500);
-}
-
-.client-mode-option span,
-.client-mode-option strong,
-.client-mode-option small {
-  display: block;
-}
-
-.client-mode-option strong {
-  color: var(--cd-green-900);
-  font-weight: 950;
-}
-
-.client-mode-option small {
-  margin-top: 4px;
-  color: var(--cd-text-muted);
-  font-size: 0.8rem;
-  font-weight: 800;
+  gap: 10px;
 }
 
 .quick-form-field {
@@ -6931,7 +6912,31 @@ select:disabled,
   box-shadow: 0 0 0 4px rgba(195, 124, 34, 0.12);
 }
 
-.manual-client-note {
+.smart-client-field .quick-form-field input {
+  min-height: 62px;
+  padding-right: 44px;
+  border-color: rgba(195, 124, 34, 0.24);
+  background:
+    linear-gradient(90deg, var(--cd-surface), rgba(253, 247, 238, 0.68)), var(--cd-surface);
+  font-size: 1.04rem;
+}
+
+.smart-client-field .quick-form-field {
+  position: relative;
+}
+
+.smart-client-field .quick-form-field::after {
+  content: '⌕';
+  position: absolute;
+  right: 16px;
+  bottom: 17px;
+  color: var(--cd-amber-700);
+  font-size: 1.2rem;
+  font-weight: 950;
+  pointer-events: none;
+}
+
+.smart-client-note {
   color: var(--cd-text-muted);
   font-size: 0.82rem;
   font-weight: 750;
@@ -7056,8 +7061,7 @@ select:disabled,
 
 .quick-product-results .product-card.selected {
   border-color: rgba(37, 146, 85, 0.34);
-  background:
-    linear-gradient(145deg, rgba(232, 248, 239, 0.7), rgba(255, 255, 255, 0.96));
+  background: linear-gradient(145deg, rgba(232, 248, 239, 0.7), rgba(255, 255, 255, 0.96));
   box-shadow: 0 16px 34px rgba(24, 72, 47, 0.08);
 }
 
@@ -7161,7 +7165,6 @@ select:disabled,
     border-radius: 20px;
   }
 
-  .client-mode-cards,
   .quick-summary-grid.enhanced-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -7635,7 +7638,11 @@ select:disabled,
   background: var(--cd-surface);
   font-size: 0.82rem;
   font-weight: 900;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
 }
 
 .dashboard-period-buttons button:hover,
@@ -8253,17 +8260,14 @@ select:disabled,
     rgba(255, 255, 255, 0.82),
     rgba(255, 255, 255, 0.58)
   );
-  --glass-surface-dark: linear-gradient(
-    145deg,
-    rgba(18, 32, 25, 0.88),
-    rgba(27, 50, 39, 0.74)
-  );
+  --glass-surface-dark: linear-gradient(145deg, rgba(18, 32, 25, 0.88), rgba(27, 50, 39, 0.74));
   --glass-border: rgba(255, 255, 255, 0.62);
   --glass-border-soft: rgba(214, 214, 211, 0.72);
   --glass-shadow: 0 24px 60px rgba(18, 32, 25, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.42);
   --glass-shadow-deep: 0 36px 100px rgba(18, 32, 25, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.48);
   --glass-card-shadow: 0 18px 42px rgba(18, 32, 25, 0.095), inset 0 1px 0 rgba(255, 255, 255, 0.36);
-  --glass-card-shadow-hover: 0 24px 58px rgba(18, 32, 25, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --glass-card-shadow-hover:
+    0 24px 58px rgba(18, 32, 25, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .liquid-glass,
@@ -8322,7 +8326,12 @@ select:disabled,
   background:
     radial-gradient(circle at 96% 0%, rgba(195, 124, 34, 0.16), transparent 25%),
     radial-gradient(circle at 4% 100%, rgba(47, 83, 65, 0.12), transparent 30%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(250, 248, 245, 0.74) 48%, rgba(241, 247, 243, 0.82));
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.84),
+      rgba(250, 248, 245, 0.74) 48%,
+      rgba(241, 247, 243, 0.82)
+    );
   box-shadow: var(--glass-shadow-deep);
   backdrop-filter: blur(22px) saturate(145%);
   -webkit-backdrop-filter: blur(22px) saturate(145%);
@@ -8415,8 +8424,7 @@ select:disabled,
 .comanda-card.occupied,
 .comanda-card.inactive {
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.56)),
-    var(--cd-surface);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.56)), var(--cd-surface);
 }
 
 .comanda-card.occupied {
@@ -8508,7 +8516,6 @@ select:disabled,
 .dashboard-category-item,
 .dashboard-critical-item,
 .customer-mode-card,
-.client-mode-option,
 .linked-mesa-card,
 .quick-helper-box,
 .empty-order-state {
@@ -8520,7 +8527,9 @@ select:disabled,
   color: var(--cd-text-inverse);
   border-color: rgba(255, 255, 255, 0.18);
   background: var(--glass-surface-dark);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .liquid-glass--light {
@@ -8619,7 +8628,9 @@ select:disabled,
   .branch-card,
   .import-export-card,
   .scale-option-card {
-    box-shadow: 0 12px 28px rgba(18, 32, 25, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+    box-shadow:
+      0 12px 28px rgba(18, 32, 25, 0.09),
+      inset 0 1px 0 rgba(255, 255, 255, 0.36);
     backdrop-filter: blur(8px) saturate(112%);
     -webkit-backdrop-filter: blur(8px) saturate(112%);
   }
