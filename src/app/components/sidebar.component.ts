@@ -100,15 +100,6 @@ import { IconComponent } from './icon.component';
         }
       </nav>
 
-      <div class="sidebar-safe-card">
-        <span class="sidebar-safe-icon">
-          <app-icon name="shield" [size]="26" />
-        </span>
-        <div>
-          <strong>{{ authService.currentUser()?.nome || 'Usuário' }}</strong>
-          <p>{{ authService.currentUser()?.nivel === 'admin' ? 'Acesso administrador' : 'Acesso por permissão' }}</p>
-        </div>
-      </div>
     </aside>
   `,
 })

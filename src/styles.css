@@ -913,44 +913,6 @@ img {
   background: rgba(255, 255, 255, 0.22);
 }
 
-.sidebar-safe-card {
-  position: relative;
-  z-index: 1;
-  flex: 0 0 auto;
-  margin-top: 18px;
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 13px;
-  padding: 18px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.045);
-}
-
-.sidebar-safe-icon {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 13px;
-  color: var(--cd-amber-400);
-  background: rgba(195, 124, 34, 0.12);
-}
-
-.sidebar-safe-card strong {
-  display: block;
-  color: var(--cd-text-inverse);
-  font-size: 0.94rem;
-  line-height: 1.32;
-}
-
-.sidebar-safe-card p {
-  margin: 8px 0 0;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 0.85rem;
-  line-height: 1.45;
-}
-
 .app-workspace {
   min-width: 0;
   display: flex;
@@ -965,7 +927,7 @@ img {
   padding: 0 clamp(22px, 3vw, 42px);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 22px;
   color: var(--cd-text-inverse);
   background:
@@ -974,28 +936,8 @@ img {
   box-shadow: 0 12px 34px rgba(18, 32, 25, 0.12);
 }
 
-.establishment-selector,
-.topbar-button {
-  min-height: 48px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  color: var(--cd-text-inverse);
-  background: rgba(255, 255, 255, 0.045);
-  font-weight: 800;
-  transition: 160ms ease;
-}
-
-.establishment-selector {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-size: clamp(1.1rem, 2vw, 1.45rem);
-}
-
 .topbar-actions {
+  flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -1021,14 +963,70 @@ img {
   color: rgba(255, 255, 255, 0.68);
 }
 
-.topbar-button {
-  padding: 0 18px;
+.topbar-user-menu {
+  position: relative;
+  flex: 0 0 auto;
 }
 
-.topbar-button:hover,
-.establishment-selector:hover {
+.topbar-avatar-button {
+  width: 48px;
+  height: 48px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  color: var(--cd-text-inverse);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  transition: 160ms ease;
+}
+
+.topbar-avatar-button:hover,
+.topbar-avatar-button[aria-expanded='true'] {
   border-color: rgba(195, 124, 34, 0.45);
   background: rgba(195, 124, 34, 0.12);
+}
+
+.topbar-user-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 40;
+  min-width: 190px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(214, 214, 211, 0.92);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 22px 60px rgba(18, 32, 25, 0.2);
+}
+
+.topbar-user-item {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 11px;
+  color: var(--cd-green-900);
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 900;
+  text-align: left;
+  transition: 160ms ease;
+}
+
+.topbar-user-item:hover:not(:disabled) {
+  background: var(--cd-green-50);
+}
+
+.topbar-user-item.danger {
+  color: var(--cd-danger);
+}
+
+.topbar-user-item:disabled {
+  color: var(--cd-text-disabled);
+  cursor: not-allowed;
 }
 
 .app-content {
@@ -2331,24 +2329,19 @@ img {
     padding-bottom: 12px;
   }
 
-  
-.sidebar-safe-card {
-    display: none;
-  }
-
   .topbar {
     position: relative;
-    flex-wrap: wrap;
     padding: 18px;
   }
 
-  .topbar-actions,
-  .topbar-search {
+  .topbar-actions {
     width: 100%;
   }
 
-  .topbar-actions {
-    flex-wrap: wrap;
+  .topbar-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
   }
 }
 
@@ -2405,14 +2398,27 @@ img {
     flex-direction: column;
   }
 
-  .page-search,
-  .topbar-search {
+  .page-search {
     width: 100%;
   }
 
-  .topbar-button {
-    flex: 1;
-    justify-content: center;
+  .topbar {
+    min-height: 76px;
+    padding: 14px;
+  }
+
+  .topbar-actions {
+    gap: 9px;
+  }
+
+  .topbar-avatar-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .topbar-user-dropdown {
+    right: 0;
+    min-width: 176px;
   }
 
   .comandas-grid {
@@ -2613,8 +2619,7 @@ body {
 }
 
 .topbar-search,
-.establishment-selector,
-.topbar-button {
+.topbar-avatar-button {
   min-height: var(--ui-input-height);
 }
 
