@@ -16,10 +16,10 @@ import { MesasPageComponent } from './pages/mesas-page.component';
 import { PedidosPageComponent } from './pages/pedidos-page.component';
 import { StockManagementPageComponent } from './pages/stock-management-page.component';
 import { StockEntriesPageComponent } from './pages/stock-entries-page.component';
-import { authGuard, permissionGuard } from './services/auth.guard';
+import { authGuard, loginGuard, permissionGuard } from './services/auth.guard';
 
 export const routes: Routes = [
-  { path: 'login', component: LoginPageComponent },
+  { path: 'login', component: LoginPageComponent, canActivate: [loginGuard] },
   {
     path: '',
     component: AppLayoutComponent,

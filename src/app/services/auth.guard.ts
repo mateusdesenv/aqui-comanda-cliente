@@ -6,10 +6,11 @@ import { FiliaisService } from './filiais.service';
 
 const SETUP_FILIAIS_PATH = '/configuracoes/filiais';
 
-export const authGuard: CanActivateFn = () => {
+export const authGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
+  await authService.waitUntilReady();
   authService.refreshCurrentUser();
 
   if (authService.isAuthenticated()) {
@@ -17,6 +18,22 @@ export const authGuard: CanActivateFn = () => {
   }
 
   return router.createUrlTree(['/login']);
+};
+
+export const loginGuard: CanActivateFn = async () => {
+  const authService = inject(AuthService);
+  const filiaisService = inject(FiliaisService);
+  const router = inject(Router);
+
+  await authService.waitUntilReady();
+
+  if (!authService.isAuthenticated()) {
+    return true;
+  }
+
+  return router.createUrlTree([
+    filiaisService.hasFilialCadastrada() ? authService.getFirstAllowedPath() : SETUP_FILIAIS_PATH,
+  ]);
 };
 
 export const permissionGuard: CanActivateFn = (route, state) => {

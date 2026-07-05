@@ -51,10 +51,10 @@ export class HeaderComponent {
     this.userMenuOpen = !this.userMenuOpen;
   }
 
-  protected logout(): void {
+  protected async logout(): Promise<void> {
     this.userMenuOpen = false;
-    this.authService.logout();
-    this.router.navigateByUrl('/login');
+    await this.authService.logout();
+    await this.router.navigateByUrl('/login');
   }
 
   @HostListener('document:click', ['$event'])

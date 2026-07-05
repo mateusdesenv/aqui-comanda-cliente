@@ -224,65 +224,70 @@ interface QuickComandaWorkflowTab {
                   />
                 </label>
 
-                <div
-                  class="category-tabs quick-category-tabs"
-                  role="tablist"
-                  aria-label="Categorias do cardápio"
-                >
-                  @for (category of categories; track category) {
+                <div class="quick-category-filter">
+                  <span class="quick-filter-label">Categorias</span>
+                  <div
+                    class="category-tabs quick-category-tabs"
+                    role="tablist"
+                    aria-label="Categorias do cardápio"
+                  >
+                    @for (category of categories; track category) {
+                      <button
+                        class="category-tab"
+                        [class.active]="activeCategory === category"
+                        type="button"
+                        role="tab"
+                        [attr.aria-selected]="activeCategory === category"
+                        (click)="setActiveCategory(category)"
+                      >
+                        {{ category }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <div class="quick-product-toolbar-actions">
+                  <div
+                    class="view-toggle stock-filter-toggle"
+                    role="group"
+                    aria-label="Filtro de estoque"
+                  >
                     <button
-                      class="category-tab"
-                      [class.active]="activeCategory === category"
                       type="button"
-                      role="tab"
-                      [attr.aria-selected]="activeCategory === category"
-                      (click)="setActiveCategory(category)"
+                      [class.active]="stockFilterMode === 'in_stock'"
+                      (click)="setStockFilterMode('in_stock')"
                     >
-                      {{ category }}
+                      Em estoque
                     </button>
-                  }
-                </div>
+                    <button
+                      type="button"
+                      [class.active]="stockFilterMode === 'all'"
+                      (click)="setStockFilterMode('all')"
+                    >
+                      Todos
+                    </button>
+                  </div>
 
-                <div
-                  class="view-toggle stock-filter-toggle"
-                  role="group"
-                  aria-label="Filtro de estoque"
-                >
-                  <button
-                    type="button"
-                    [class.active]="stockFilterMode === 'in_stock'"
-                    (click)="setStockFilterMode('in_stock')"
+                  <div
+                    class="view-toggle quick-product-view-toggle"
+                    role="group"
+                    aria-label="Visualização dos produtos"
                   >
-                    Em estoque
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="stockFilterMode === 'all'"
-                    (click)="setStockFilterMode('all')"
-                  >
-                    Todos
-                  </button>
-                </div>
-
-                <div
-                  class="view-toggle quick-product-view-toggle"
-                  role="group"
-                  aria-label="Visualização dos produtos"
-                >
-                  <button
-                    type="button"
-                    [class.active]="productViewMode === 'lista'"
-                    (click)="setProductViewMode('lista')"
-                  >
-                    Lista
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="productViewMode === 'grid'"
-                    (click)="setProductViewMode('grid')"
-                  >
-                    Grid
-                  </button>
+                    <button
+                      type="button"
+                      [class.active]="productViewMode === 'lista'"
+                      (click)="setProductViewMode('lista')"
+                    >
+                      Lista
+                    </button>
+                    <button
+                      type="button"
+                      [class.active]="productViewMode === 'grid'"
+                      (click)="setProductViewMode('grid')"
+                    >
+                      Grid
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -584,10 +589,10 @@ interface QuickComandaWorkflowTab {
               <button
                 class="modal-primary-action"
                 type="button"
-                [disabled]="!canSave"
+                [disabled]="isSavingComanda"
                 (click)="saveComanda()"
               >
-                {{ primaryActionLabel }}
+                {{ isSavingComanda ? 'Salvando...' : primaryActionLabel }}
               </button>
             }
           </div>
@@ -624,6 +629,7 @@ export class QuickComandaModalComponent implements OnChanges {
   protected manualClienteNome = '';
   protected selectedMesaId = '';
   protected errorMessage = '';
+  protected isSavingComanda = false;
   protected items: ItemComanda[] = [];
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -1009,6 +1015,10 @@ export class QuickComandaModalComponent implements OnChanges {
   protected saveComanda(): void {
     this.errorMessage = '';
 
+    if (this.isSavingComanda) {
+      return;
+    }
+
     if (!this.canEditComanda) {
       this.errorMessage = 'Esta comanda já foi finalizada e não pode mais ser alterada.';
       this.activeStep = 'resumo';
@@ -1038,6 +1048,7 @@ export class QuickComandaModalComponent implements OnChanges {
       return;
     }
 
+    this.isSavingComanda = true;
     const payload = {
       clienteId: this.clienteMode === 'manual' ? undefined : selectedCliente?.id,
       clienteNome,
@@ -1053,6 +1064,7 @@ export class QuickComandaModalComponent implements OnChanges {
         ? this.comandasService.updateComanda(this.editingComanda.id, payload)
         : this.comandasService.createComanda(payload);
     } catch (error) {
+      this.isSavingComanda = false;
       this.errorMessage =
         error instanceof Error ? error.message : 'Produto sem estoque disponível.';
       this.activeStep = 'produtos';
@@ -1060,6 +1072,7 @@ export class QuickComandaModalComponent implements OnChanges {
     }
 
     if (!comanda) {
+      this.isSavingComanda = false;
       this.errorMessage = 'Não foi possível encontrar a comanda para edição.';
       return;
     }
@@ -1188,6 +1201,7 @@ export class QuickComandaModalComponent implements OnChanges {
 
   private initializeForm(): void {
     this.errorMessage = '';
+    this.isSavingComanda = false;
     this.activeStep = 'cliente';
     this.productSearch = '';
     this.productViewMode = 'lista';
