@@ -19,11 +19,15 @@ export class UiSettingsService {
 
   constructor() {
     this.applyScaleClass(this.scale());
-    void this.reload().catch(() => undefined);
   }
 
   getScale(): UiScale {
     return this.scale();
+  }
+
+  clearData(): void {
+    this.scale.set('medium');
+    this.applyScaleClass('medium');
   }
 
   setScale(scale: UiScale): void {
@@ -61,7 +65,7 @@ export class UiSettingsService {
     return labels[scale];
   }
 
-  private async reload(): Promise<void> {
+  async reload(): Promise<void> {
     const settings = await lastValueFrom(this.api.get<{ uiScale: UiScale }>('/configuracoes/ui'));
     const scale = settings.uiScale ?? 'medium';
     this.scale.set(scale);

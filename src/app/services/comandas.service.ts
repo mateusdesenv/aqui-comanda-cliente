@@ -41,6 +41,10 @@ export class ComandasService {
     return this.comandas();
   }
 
+  clearData(): void {
+    this.comandas.set([]);
+  }
+
   getOpenComandas(): Comanda[] {
     return this.comandasAbertas();
   }

@@ -42,6 +42,10 @@ export class PedidosService {
     return this.pedidos();
   }
 
+  clearData(): void {
+    this.pedidos.set([]);
+  }
+
   getPedidosAtivos(): Pedido[] {
     return this.pedidosAtivos();
   }

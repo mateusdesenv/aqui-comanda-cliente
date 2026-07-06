@@ -86,6 +86,7 @@ export interface Filial {
 export interface Colaborador {
   id: string;
   nome: string;
+  cpf?: string;
   usuario: string;
   senha: string;
   nivel: NivelAcesso;

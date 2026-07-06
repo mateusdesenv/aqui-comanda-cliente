@@ -105,6 +105,10 @@ export class MenuOrderService {
     return [...this.menuItems()];
   }
 
+  clearData(): void {
+    this.order.set([]);
+  }
+
   saveOrder(order: string[]): void {
     const normalizedOrder = this.normalizeOrder(order);
     this.order.set(normalizedOrder);
@@ -146,7 +150,7 @@ export class MenuOrderService {
     return normalizedOrder;
   }
 
-  private async reload(): Promise<void> {
+  async reload(): Promise<void> {
     const settings = await lastValueFrom(this.api.get<{ menuOrder: string[] }>('/configuracoes/menu-order'));
     this.order.set(this.normalizeOrder(settings.menuOrder ?? []));
   }

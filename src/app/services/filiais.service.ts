@@ -38,6 +38,10 @@ export class FiliaisService {
     return this.filiais();
   }
 
+  clearData(): void {
+    this.filiais.set([]);
+  }
+
   getFilialById(id: string): Filial | null {
     return this.filiais().find((filial) => filial.id === id) ?? null;
   }
@@ -165,7 +169,7 @@ export class FiliaisService {
   }
 
   async reload(): Promise<void> {
-    const filiais = await lastValueFrom(this.api.list<Filial>('/filiais', { limit: 500 }));
+    const filiais = await lastValueFrom(this.api.list<Filial>('/filiais', { limit: 99 }));
     this.filiais.set(this.normalizeFiliais(mapApiList(filiais)));
   }
 

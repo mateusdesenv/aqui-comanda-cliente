@@ -3,10 +3,11 @@ import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Colaborador, NivelAcesso, PermissaoTela, TelaSistema, telasSistema } from '../models/app-data';
+import { normalizeCpf } from '../utils/cpf';
 
 export interface ColaboradorPayload {
   nome: string;
-  usuario: string;
+  cpf: string;
   senha?: string;
   nivel: NivelAcesso;
   ativo: boolean;
@@ -27,29 +28,33 @@ export class ColaboradoresService {
     return this.colaboradores();
   }
 
+  clearData(): void {
+    this.colaboradores.set([]);
+  }
+
   getColaboradorById(id: string): Colaborador | null {
     return this.colaboradores().find((colaborador) => colaborador.id === id) ?? null;
   }
 
-  authenticate(usuario: string, senha: string): Colaborador | null {
-    const normalizedUsuario = usuario.trim().toLowerCase();
+  authenticate(cpf: string, senha: string): Colaborador | null {
+    const normalizedCpf = normalizeCpf(cpf);
 
     return (
       this.colaboradores().find(
         (colaborador) =>
           colaborador.ativo &&
-          colaborador.usuario.trim().toLowerCase() === normalizedUsuario &&
+          normalizeCpf(colaborador.cpf ?? colaborador.usuario) === normalizedCpf &&
           colaborador.senha === senha,
       ) ?? null
     );
   }
 
-  hasUsuario(usuario: string, ignoreId?: string): boolean {
-    const normalizedUsuario = usuario.trim().toLowerCase();
+  hasCpf(cpf: string, ignoreId?: string): boolean {
+    const normalizedCpf = normalizeCpf(cpf);
 
     return this.colaboradores().some(
       (colaborador) =>
-        colaborador.id !== ignoreId && colaborador.usuario.trim().toLowerCase() === normalizedUsuario,
+        colaborador.id !== ignoreId && normalizeCpf(colaborador.cpf ?? colaborador.usuario) === normalizedCpf,
     );
   }
 
@@ -58,7 +63,8 @@ export class ColaboradoresService {
     const colaborador: Colaborador = {
       id: this.createId(),
       nome: payload.nome,
-      usuario: payload.usuario,
+      cpf: normalizeCpf(payload.cpf),
+      usuario: normalizeCpf(payload.cpf),
       senha: payload.senha ?? '',
       nivel: payload.nivel,
       ativo: payload.ativo,
@@ -87,7 +93,8 @@ export class ColaboradoresService {
           updatedColaborador = {
             ...colaborador,
             nome: payload.nome,
-            usuario: payload.usuario,
+            cpf: normalizeCpf(payload.cpf),
+            usuario: normalizeCpf(payload.cpf),
             senha: payload.senha ? payload.senha : colaborador.senha,
             nivel: payload.nivel,
             ativo: payload.ativo,
@@ -168,7 +175,8 @@ export class ColaboradoresService {
     return this.sortByName(
       colaboradores.map((colaborador) => ({
         ...mapApiEntity(colaborador),
-        usuario: colaborador.usuario ?? (colaborador as Colaborador & { email?: string }).email ?? '',
+        cpf: normalizeCpf(colaborador.cpf ?? (colaborador as Colaborador & { usuario?: string }).usuario),
+        usuario: normalizeCpf(colaborador.cpf ?? colaborador.usuario) || ((colaborador as Colaborador & { email?: string }).email ?? ''),
         senha: colaborador.senha ?? '',
         nivel: colaborador.nivel ?? (colaborador as Colaborador & { role?: NivelAcesso }).role ?? 'colaborador',
         ativo: colaborador.ativo ?? true,
@@ -198,12 +206,12 @@ export class ColaboradoresService {
   private toApiPayload(payload: ColaboradorPayload): Record<string, unknown> {
     return {
       nome: payload.nome,
-      usuario: payload.usuario,
-      email: payload.usuario,
+      cpf: normalizeCpf(payload.cpf),
       role: payload.nivel,
       nivel: payload.nivel,
       ativo: payload.ativo,
       permissoes: this.normalizePermissoes(payload.permissoes, payload.nivel),
+      senha: payload.senha,
     };
   }
 }

@@ -26,6 +26,10 @@ export class MesasService {
     return this.mesas();
   }
 
+  clearData(): void {
+    this.mesas.set([]);
+  }
+
   createMesa(payload: MesaPayload): Mesa {
     const now = new Date().toISOString();
     const mesa: Mesa = {

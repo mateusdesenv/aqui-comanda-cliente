@@ -38,6 +38,10 @@ export class ProdutosService {
     return this.produtos();
   }
 
+  clearData(): void {
+    this.produtos.set([]);
+  }
+
   getActiveProdutos(): Produto[] {
     return this.produtosAtivos();
   }

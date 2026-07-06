@@ -23,6 +23,11 @@ export class CaixaService {
     return this.sessoes();
   }
 
+  clearData(): void {
+    this.entradas.set([]);
+    this.sessoes.set([]);
+  }
+
   getSessaoAberta(): SessaoCaixa | null {
     return this.sessoes().find((sessao) => sessao.status === 'aberto') ?? null;
   }

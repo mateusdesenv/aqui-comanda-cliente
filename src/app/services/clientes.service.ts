@@ -26,6 +26,10 @@ export class ClientesService {
     return this.clientes();
   }
 
+  clearData(): void {
+    this.clientes.set([]);
+  }
+
   createCliente(payload: ClientePayload): Cliente {
     const now = new Date().toISOString();
     const cliente: Cliente = {

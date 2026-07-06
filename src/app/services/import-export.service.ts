@@ -142,6 +142,10 @@ export class ImportExportService {
     return this.modules.map((module) => ({ ...module, entries: module.entries.map((entry) => ({ ...entry })) }));
   }
 
+  clearData(): void {
+    this.backupCache = {};
+  }
+
   getModule(moduleId: string): ImportExportModule | undefined {
     return this.getModules().find((module) => module.id === moduleId);
   }

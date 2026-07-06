@@ -11,9 +11,8 @@ export const authGuard: CanActivateFn = async () => {
   const router = inject(Router);
 
   await authService.waitUntilReady();
-  authService.refreshCurrentUser();
-
   if (authService.isAuthenticated()) {
+    await authService.refreshCurrentUser();
     return true;
   }
 
@@ -43,6 +42,13 @@ export const permissionGuard: CanActivateFn = async (route, state) => {
   const router = inject(Router);
   const tela = route.data?.['tela'] as TelaSistema | undefined;
   const isFiliaisSetupRoute = state.url.startsWith(SETUP_FILIAIS_PATH);
+
+  await authService.waitUntilReady();
+  if (!authService.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
+
+  await authService.refreshCurrentUser();
   await filiaisService.reload().catch(() => undefined);
   const hasFilialCadastrada = filiaisService.hasFilialCadastrada();
 

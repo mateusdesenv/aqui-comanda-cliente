@@ -33,6 +33,10 @@ export class StockEntriesService {
     return this.stockEntries();
   }
 
+  clearData(): void {
+    this.stockEntries.set([]);
+  }
+
   getStockEntryById(id: string): StockEntry | null {
     return this.stockEntries().find((entry) => entry.id === id) ?? null;
   }
