@@ -1,8 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
-import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
-import { StockEntry, StockEntryItem } from '../models/app-data';
+import { friendlyApiError, mapApiEntity, mapApiList } from '../core/api/api-mappers';
+import { StockEntry } from '../models/app-data';
 import { ProdutosService } from './produtos.service';
 
 export interface StockEntryItemPayload {
@@ -41,42 +41,20 @@ export class StockEntriesService {
     return this.stockEntries().find((entry) => entry.id === id) ?? null;
   }
 
-  createStockEntry(payload: StockEntryPayload): StockEntry {
+  async createStockEntry(payload: StockEntryPayload): Promise<StockEntry> {
     const normalizedPayload = this.validatePayload(payload);
-    const now = new Date().toISOString();
-    const items = normalizedPayload.items.map((item): StockEntryItem => {
-      const produto = this.produtosService.getProdutoById(item.productId);
 
-      if (!produto) {
-        throw new Error('Produto não encontrado para entrada de estoque.');
-      }
+    try {
+      const created = await lastValueFrom(this.api.post<StockEntry>('/estoque/entradas', normalizedPayload));
+      const entry = this.mapStockEntry(created);
 
-      return {
-        productId: produto.id,
-        productName: produto.nome,
-        quantity: item.quantity,
-        unitCost: item.unitCost,
-        totalCost: item.quantity * item.unitCost,
-      };
-    });
-    const totalCost = items.reduce((total, item) => total + item.totalCost, 0);
-    const entry: StockEntry = {
-      id: this.createId(),
-      date: normalizedPayload.date,
-      notes: normalizedPayload.notes,
-      supplierName: normalizedPayload.supplierName,
-      totalCost,
-      items,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.stockEntries.set(this.sortEntries([entry, ...this.stockEntries()]));
-    void lastValueFrom(this.api.post<StockEntry>('/estoque/entradas', normalizedPayload)).then(async (created) => {
-      this.stockEntries.set(this.sortEntries([this.mapStockEntry(created), ...this.stockEntries().filter((item) => item.id !== entry.id)]));
+      this.stockEntries.set(this.sortEntries([entry, ...this.stockEntries().filter((item) => item.id !== entry.id)]));
       await this.produtosService.reload();
-    });
-    return entry;
+
+      return entry;
+    } catch (error) {
+      throw new Error(friendlyApiError(error, 'Não foi possível registrar a entrada de estoque.'));
+    }
   }
 
   private validatePayload(payload: StockEntryPayload): StockEntryPayload {
@@ -128,7 +106,8 @@ export class StockEntriesService {
 
   private normalizeEntries(entries: StockEntry[]): StockEntry[] {
     return entries.map((entry) => ({
-      ...entry,
+      ...mapApiEntity(entry),
+      date: this.normalizeDateOnly(entry.date),
       notes: entry.notes?.trim() || undefined,
       supplierName: entry.supplierName?.trim() || undefined,
       totalCost: Number(entry.totalCost) || 0,
@@ -142,6 +121,26 @@ export class StockEntriesService {
       createdAt: entry.createdAt ?? new Date().toISOString(),
       updatedAt: entry.updatedAt ?? entry.createdAt ?? new Date().toISOString(),
     }));
+  }
+
+  private normalizeDateOnly(value: string): string {
+    if (!value) {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    const raw = String(value);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    const parsed = new Date(raw);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return raw.slice(0, 10);
+    }
+
+    return parsed.toISOString().slice(0, 10);
   }
 
   private createId(): string {
@@ -162,6 +161,6 @@ export class StockEntriesService {
   }
 
   private mapStockEntry(entry: StockEntry): StockEntry {
-    return this.normalizeEntries([mapApiEntity(entry)])[0];
+    return this.normalizeEntries([entry])[0];
   }
 }

@@ -246,14 +246,50 @@ export class ProdutosService {
     return produtos.map((produto) => ({
       ...mapApiEntity(produto),
       tamanho: this.normalizeTamanho((produto as Produto & { tamanho?: string }).tamanho),
-      stockQuantity: Number(produto.stockQuantity) || 0,
-      costPrice: Number(produto.costPrice) || 0,
+      stockQuantity: this.resolveStockQuantity(produto),
+      costPrice: this.resolveCostPrice(produto),
       controlaEstoque: produto.controlaEstoque ?? true,
       descricao: produto.descricao ?? '',
       ativo: produto.ativo ?? true,
       createdAt: produto.createdAt ?? new Date().toISOString(),
       updatedAt: produto.updatedAt ?? produto.createdAt ?? new Date().toISOString(),
     }));
+  }
+
+  private resolveStockQuantity(produto: Produto): number {
+    const stockFields = produto as Produto & {
+      estoqueAtual?: unknown;
+      stock?: unknown;
+      quantity?: unknown;
+    };
+
+    const value =
+      stockFields.stockQuantity ??
+      stockFields.estoqueAtual ??
+      stockFields.stock ??
+      stockFields.quantity ??
+      0;
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  }
+
+  private resolveCostPrice(produto: Produto): number {
+    const costFields = produto as Produto & {
+      custoMedio?: unknown;
+      averageCost?: unknown;
+      unitCost?: unknown;
+    };
+
+    const value =
+      costFields.costPrice ??
+      costFields.custoMedio ??
+      costFields.averageCost ??
+      costFields.unitCost ??
+      0;
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
   }
 
   private normalizeTamanho(tamanho?: string): ProdutoTamanho {

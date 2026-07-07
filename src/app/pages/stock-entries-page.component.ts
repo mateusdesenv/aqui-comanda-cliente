@@ -187,8 +187,8 @@ interface StockEntryForm {
               }
 
               <div class="form-actions">
-                <button class="primary-action-button" type="submit" [disabled]="!canWriteStock">
-                  Salvar entrada
+                <button class="primary-action-button" type="submit" [disabled]="!canWriteStock || isSavingEntry">
+                  {{ isSavingEntry ? 'Salvando...' : 'Salvar entrada' }}
                 </button>
                 <button class="ghost-button" type="button" (click)="closeCreateModal()">Cancelar</button>
               </div>
@@ -253,13 +253,20 @@ export class StockEntriesPageComponent {
   private readonly produtosService = inject(ProdutosService);
   private readonly authService = inject(AuthService);
 
-  protected entries = this.stockEntriesService.getStockEntries();
-  protected produtos = this.produtosService.getProdutos();
   protected entryModalOpen = false;
   protected detailsEntry: StockEntry | null = null;
   protected errorMessage = '';
   protected successMessage = '';
+  protected isSavingEntry = false;
   protected form: StockEntryForm = this.createEmptyForm();
+
+  protected get entries(): StockEntry[] {
+    return this.stockEntriesService.getStockEntries();
+  }
+
+  protected get produtos(): Produto[] {
+    return this.produtosService.getProdutos();
+  }
 
   protected get canWriteStock(): boolean {
     return this.authService.canWrite('estoque');
@@ -277,7 +284,6 @@ export class StockEntriesPageComponent {
 
     this.errorMessage = '';
     this.successMessage = '';
-    this.produtos = this.produtosService.getProdutos();
     this.form = this.createEmptyForm();
     this.entryModalOpen = true;
   }
@@ -331,14 +337,19 @@ export class StockEntriesPageComponent {
     return this.form.items.some((item, index) => index !== currentIndex && item.productId === productId);
   }
 
-  protected saveEntry(): void {
+  protected async saveEntry(): Promise<void> {
     if (!this.canWriteStock) {
       this.errorMessage = 'Você não tem permissão de escrita em Entrada de Estoque.';
       return;
     }
 
+    if (this.isSavingEntry) {
+      return;
+    }
+
     this.errorMessage = '';
     this.successMessage = '';
+    this.isSavingEntry = true;
 
     try {
       const payload: StockEntryPayload = {
@@ -352,14 +363,14 @@ export class StockEntriesPageComponent {
         })),
       };
 
-      this.stockEntriesService.createStockEntry(payload);
-      this.entries = this.stockEntriesService.getStockEntries();
-      this.produtos = this.produtosService.getProdutos();
+      await this.stockEntriesService.createStockEntry(payload);
       this.entryModalOpen = false;
       this.form = this.createEmptyForm();
       this.successMessage = 'Entrada de estoque registrada com sucesso.';
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Não foi possível registrar a entrada.';
+    } finally {
+      this.isSavingEntry = false;
     }
   }
 
@@ -377,7 +388,13 @@ export class StockEntriesPageComponent {
   }
 
   protected formatDate(value: string): string {
-    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(`${value}T00:00:00`));
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value || '-';
+    }
+
+    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(date);
   }
 
   protected formatDateTime(value: string): string {
