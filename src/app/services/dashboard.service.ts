@@ -1,4 +1,6 @@
 import { Injectable, inject } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
 import { Comanda, ItemComanda, ItemPedido, Pedido, Produto } from '../models/app-data';
 import { ComandasService } from './comandas.service';
 import { PedidosService } from './pedidos.service';
@@ -82,44 +84,81 @@ interface DashboardSaleItem {
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
+  private readonly api = inject(ApiClientService);
   private readonly comandasService = inject(ComandasService);
   private readonly pedidosService = inject(PedidosService);
   private readonly produtosService = inject(ProdutosService);
   private readonly stockEntriesService = inject(StockEntriesService);
+  private readonly emptySummary: DashboardSummary = {
+    salesTotal: 0,
+    cmvTotal: 0,
+    grossProfit: 0,
+    grossMarginPercent: 0,
+    averageTicket: 0,
+    closedOrdersCount: 0,
+    openCommandsCount: 0,
+    salesByPeriod: [],
+    financialComparison: [
+      { label: 'Faturamento', value: 0 },
+      { label: 'CMV', value: 0 },
+      { label: 'Lucro bruto', value: 0 },
+    ],
+    topProductsByProfit: [],
+    topProductsByQuantity: [],
+    salesByCategory: [],
+    criticalStock: [],
+  };
+  private cachedSummary: DashboardSummary = this.emptySummary;
+  private lastRequestKey = '';
 
   getSummary(period: DashboardPeriod): DashboardSummary {
-    const sales = this.getSalesInPeriod(period);
-    const salesTotal = this.roundCurrency(sales.reduce((total, sale) => total + sale.total, 0));
-    const cmvTotal = this.roundCurrency(sales.reduce((total, sale) => total + sale.cmv, 0));
-    const grossProfit = this.roundCurrency(salesTotal - cmvTotal);
-    const grossMarginPercent = salesTotal > 0 ? this.roundCurrency((grossProfit / salesTotal) * 100) : 0;
-    const closedOrdersCount = sales.length;
-    const averageTicket = closedOrdersCount > 0 ? this.roundCurrency(salesTotal / closedOrdersCount) : 0;
+    const key = JSON.stringify(period);
+    if (key !== this.lastRequestKey) {
+      this.lastRequestKey = key;
+      void this.fetchSummary(period);
+    }
 
-    return {
-      salesTotal,
-      cmvTotal,
-      grossProfit,
-      grossMarginPercent,
-      averageTicket,
-      closedOrdersCount,
-      openCommandsCount: this.comandasService.getOpenComandas().length,
-      salesByPeriod: this.buildSalesChart(sales, period),
-      financialComparison: [
-        { label: 'Faturamento', value: salesTotal },
-        { label: 'CMV', value: cmvTotal },
-        { label: 'Lucro bruto', value: grossProfit },
-      ],
-      topProductsByProfit: this.buildTopProductsByProfit(sales),
-      topProductsByQuantity: this.buildTopProductsByQuantity(sales),
-      salesByCategory: this.buildSalesByCategory(sales),
-      criticalStock: this.buildCriticalStock(),
-    };
+    return this.cachedSummary;
   }
 
   getDefaultPeriod(): DashboardPeriod {
     const today = this.toInputDate(new Date());
     return { preset: 'today', startDate: today, endDate: today };
+  }
+
+  private async fetchSummary(period: DashboardPeriod): Promise<void> {
+    const data = await lastValueFrom(
+      this.api.get<Partial<DashboardSummary>>('/dashboard', {
+        preset: period.preset,
+        startDate: period.startDate,
+        endDate: period.endDate,
+      }),
+    );
+    const salesTotal = Number(data.salesTotal) || 0;
+    const cmvTotal = Number(data.cmvTotal) || 0;
+    const grossProfit = Number(data.grossProfit) || salesTotal - cmvTotal;
+
+    this.cachedSummary = {
+      ...this.emptySummary,
+      ...data,
+      salesTotal,
+      cmvTotal,
+      grossProfit,
+      grossMarginPercent: Number(data.grossMarginPercent) || (salesTotal > 0 ? this.roundCurrency((grossProfit / salesTotal) * 100) : 0),
+      averageTicket: Number(data.averageTicket) || 0,
+      closedOrdersCount: Number(data.closedOrdersCount) || 0,
+      openCommandsCount: Number(data.openCommandsCount) || 0,
+      salesByPeriod: data.salesByPeriod ?? [],
+      financialComparison: data.financialComparison ?? [
+        { label: 'Faturamento', value: salesTotal },
+        { label: 'CMV', value: cmvTotal },
+        { label: 'Lucro bruto', value: grossProfit },
+      ],
+      topProductsByProfit: data.topProductsByProfit ?? [],
+      topProductsByQuantity: data.topProductsByQuantity ?? [],
+      salesByCategory: data.salesByCategory ?? [],
+      criticalStock: data.criticalStock ?? [],
+    };
   }
 
   resolvePreset(preset: DashboardPeriodPreset, currentPeriod?: DashboardPeriod): DashboardPeriod {

@@ -1,6 +1,8 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { ItemPedido, Pedido, PedidoPaymentMethod, PedidoStatus } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
 
 export interface PedidoPayload {
   clienteId?: string;
@@ -24,24 +26,24 @@ export interface PedidoPayload {
 
 @Injectable({ providedIn: 'root' })
 export class PedidosService {
+  private readonly api = inject(ApiClientService);
   private readonly workflowStatusSequence: PedidoStatus[] = ['aberto', 'em_preparo', 'saiu_entrega', 'entregue'];
 
-  private readonly repository = new LocalStorageRepository<Pedido[]>(
-    'aqui-comanda:pedidos',
-    [],
-  );
-
-  readonly pedidos = signal<Pedido[]>(this.sortByCreatedAt(this.normalizePedidos(this.repository.read())));
+  readonly pedidos = signal<Pedido[]>([]);
   readonly pedidosAtivos = computed(() =>
     this.pedidos().filter((pedido) => !['entregue', 'cancelado'].includes(pedido.status)),
   );
 
   constructor() {
-    this.persist();
+    void this.reload().catch(() => undefined);
   }
 
   getPedidos(): Pedido[] {
     return this.pedidos();
+  }
+
+  clearData(): void {
+    this.pedidos.set([]);
   }
 
   getPedidosAtivos(): Pedido[] {
@@ -77,7 +79,9 @@ export class PedidosService {
     };
 
     this.pedidos.set(this.sortByCreatedAt([pedido, ...this.pedidos()]));
-    this.persist();
+    void lastValueFrom(this.api.post<Pedido>('/pedidos', payload)).then((created) => {
+      this.pedidos.set(this.sortByCreatedAt([this.mapPedido(created), ...this.pedidos().filter((item) => item.id !== pedido.id)]));
+    });
     return pedido;
   }
 
@@ -124,7 +128,9 @@ export class PedidosService {
         this.pedidos().map((pedido) => (pedido.id === id ? updatedPedido : pedido)),
       ),
     );
-    this.persist();
+    void lastValueFrom(this.api.put<Pedido>(`/pedidos/${id}`, payload)).then((updated) => {
+      this.pedidos.set(this.sortByCreatedAt(this.pedidos().map((pedido) => (pedido.id === id ? this.mapPedido(updated) : pedido))));
+    });
     return updatedPedido;
   }
 
@@ -147,7 +153,9 @@ export class PedidosService {
         }),
       ),
     );
-    this.persist();
+    void lastValueFrom(this.api.post<Pedido>(`/pedidos/${id}/confirmar-pagamento`, {})).then((updated) => {
+      this.pedidos.set(this.sortByCreatedAt(this.pedidos().map((pedido) => (pedido.id === id ? this.mapPedido(updated) : pedido))));
+    });
     return updatedPedido;
   }
 
@@ -175,13 +183,15 @@ export class PedidosService {
         }),
       ),
     );
-    this.persist();
+    void lastValueFrom(this.api.patch<Pedido>(`/pedidos/${id}/status`, { status })).then((updated) => {
+      this.pedidos.set(this.sortByCreatedAt(this.pedidos().map((pedido) => (pedido.id === id ? this.mapPedido(updated) : pedido))));
+    });
     return updatedPedido;
   }
 
   deletePedido(id: string): void {
     this.pedidos.set(this.pedidos().filter((pedido) => pedido.id !== id));
-    this.persist();
+    void lastValueFrom(this.api.delete(`/pedidos/${id}`));
   }
 
   private normalizePedidos(pedidos: Pedido[]): Pedido[] {
@@ -189,7 +199,7 @@ export class PedidosService {
       const itens = this.normalizeItems(pedido.itens ?? []);
 
       return {
-        ...pedido,
+        ...mapApiEntity(pedido),
         codigo: pedido.codigo || `PED-${String(index + 1).padStart(4, '0')}`,
         clienteNome: pedido.clienteNome || 'Cliente não informado',
         cepEntrega: pedido.cepEntrega || undefined,
@@ -217,10 +227,6 @@ export class PedidosService {
     return items.reduce((total, item) => total + item.subtotal, 0);
   }
 
-  private persist(): void {
-    this.repository.write(this.pedidos());
-  }
-
   private sortByCreatedAt(pedidos: Pedido[]): Pedido[] {
     return [...pedidos].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
@@ -232,5 +238,14 @@ export class PedidosService {
   private createCodigo(): string {
     const nextNumber = this.pedidos().length + 1;
     return `PED-${String(nextNumber).padStart(4, '0')}`;
+  }
+
+  async reload(): Promise<void> {
+    const pedidos = await lastValueFrom(this.api.listAll<Pedido>('/pedidos'));
+    this.pedidos.set(this.sortByCreatedAt(this.normalizePedidos(mapApiList(pedidos))));
+  }
+
+  private mapPedido(pedido: Pedido): Pedido {
+    return this.normalizePedidos([pedido])[0];
   }
 }

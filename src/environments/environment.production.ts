@@ -1,5 +1,5 @@
 export const environment = {
-  production: false,
+  production: true,
   apiUrl: 'https://aqui-comanda-api.vercel.app/api',
   printerApiUrl: 'http://localhost:3334',
   firebase: {

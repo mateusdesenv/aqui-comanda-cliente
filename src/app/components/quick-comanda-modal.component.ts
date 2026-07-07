@@ -93,83 +93,44 @@ interface QuickComandaWorkflowTab {
                     <span>01</span>
                     <div>
                       <h3>Cliente da comanda</h3>
-                      <p>Escolha um cliente salvo ou use um nome rápido para atendimento.</p>
+                      <p>
+                        Digite o nome do responsável. Se ele existir no cadastro, o vínculo é feito
+                        automaticamente.
+                      </p>
                     </div>
                   </header>
 
-                  <div
-                    class="client-mode-cards"
-                    role="radiogroup"
-                    aria-label="Tipo de cliente da comanda"
-                  >
-                    <label class="client-mode-option" [class.active]="clienteMode === 'cadastrado'">
-                      <input
-                        type="radio"
-                        name="clienteMode"
-                        value="cadastrado"
-                        [(ngModel)]="clienteMode"
-                        [disabled]="!canEditComanda"
-                        (ngModelChange)="onClienteModeChange()"
-                      />
-                      <span>
-                        <strong>Cliente cadastrado</strong>
-                        <small>Vincular ao cadastro de clientes</small>
-                      </span>
-                    </label>
-
-                    <label class="client-mode-option" [class.active]="clienteMode === 'manual'">
-                      <input
-                        type="radio"
-                        name="clienteMode"
-                        value="manual"
-                        [(ngModel)]="clienteMode"
-                        [disabled]="!canEditComanda"
-                        (ngModelChange)="onClienteModeChange()"
-                      />
-                      <span>
-                        <strong>Não cadastrado</strong>
-                        <small>Informar apenas o nome</small>
-                      </span>
-                    </label>
-                  </div>
-
-                  @if (clienteMode === 'cadastrado') {
+                  <div class="smart-client-field">
                     <label class="quick-form-field">
-                      Cliente responsável pela comanda
-                      <select
-                        name="cliente"
-                        [(ngModel)]="selectedClienteId"
-                        [disabled]="!canEditComanda"
-                        (ngModelChange)="clearStepFeedback()"
-                      >
-                        <option value="">Selecione um cliente</option>
-                        @for (cliente of clientes; track cliente.id) {
-                          <option [value]="cliente.id">
-                            {{ cliente.nome }} — {{ cliente.cpf }}
-                          </option>
-                        }
-                      </select>
-                    </label>
-                  } @else {
-                    <label class="quick-form-field">
-                      Nome do cliente não cadastrado
+                      Cliente responsável
                       <input
                         type="text"
-                        name="manualClienteNome"
-                        placeholder="Ex.: João da Silva"
-                        [(ngModel)]="manualClienteNome"
+                        name="clienteResponsavel"
+                        list="quick-comanda-clientes"
+                        autocomplete="off"
+                        placeholder="Digite nome ou CPF"
+                        [(ngModel)]="clienteSearchTerm"
                         [disabled]="!canEditComanda"
-                        (ngModelChange)="clearStepFeedback()"
+                        (ngModelChange)="onClienteSearchChange($event)"
                       />
                     </label>
-                    <small class="manual-client-note">
-                      Esse nome será usado apenas nesta comanda. O cliente não será cadastrado
-                      automaticamente.
+
+                    <datalist id="quick-comanda-clientes">
+                      @for (cliente of clientes; track cliente.id) {
+                        <option [value]="getClienteOptionLabel(cliente)">
+                          {{ cliente.nome }} - {{ cliente.cpf }}
+                        </option>
+                      }
+                    </datalist>
+
+                    <small class="smart-client-note">
+                      Selecione uma sugestão para vincular ao cadastro ou continue com o nome
+                      digitado.
                     </small>
-                  }
+                  </div>
 
                   <div class="customer-link-indicator" [class.manual]="clienteMode === 'manual'">
-                    {{ clienteMode === 'manual' ? 'Cliente não cadastrado' : 'Cliente cadastrado' }}
+                    {{ clienteMode === 'manual' ? 'Nome livre' : 'Cadastro vinculado' }}
                   </div>
                 </section>
 
@@ -227,11 +188,11 @@ interface QuickComandaWorkflowTab {
                 </section>
               </div>
 
-              @if (clientes.length === 0 && clienteMode === 'cadastrado') {
+              @if (clientes.length === 0) {
                 <div class="quick-helper-box quick-client-helper">
                   <div>
                     <strong>Nenhum cliente cadastrado</strong>
-                    <span>Use a opção “Não cadastrado” ou cadastre um cliente na base.</span>
+                    <span>Você ainda pode digitar um nome livre para esta comanda.</span>
                   </div>
                   <a routerLink="/clientes" (click)="close.emit()">Ir para Clientes</a>
                 </div>
@@ -263,65 +224,70 @@ interface QuickComandaWorkflowTab {
                   />
                 </label>
 
-                <div
-                  class="category-tabs quick-category-tabs"
-                  role="tablist"
-                  aria-label="Categorias do cardápio"
-                >
-                  @for (category of categories; track category) {
+                <div class="quick-category-filter">
+                  <span class="quick-filter-label">Categorias</span>
+                  <div
+                    class="category-tabs quick-category-tabs"
+                    role="tablist"
+                    aria-label="Categorias do cardápio"
+                  >
+                    @for (category of categories; track category) {
+                      <button
+                        class="category-tab"
+                        [class.active]="activeCategory === category"
+                        type="button"
+                        role="tab"
+                        [attr.aria-selected]="activeCategory === category"
+                        (click)="setActiveCategory(category)"
+                      >
+                        {{ category }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <div class="quick-product-toolbar-actions">
+                  <div
+                    class="view-toggle stock-filter-toggle"
+                    role="group"
+                    aria-label="Filtro de estoque"
+                  >
                     <button
-                      class="category-tab"
-                      [class.active]="activeCategory === category"
                       type="button"
-                      role="tab"
-                      [attr.aria-selected]="activeCategory === category"
-                      (click)="setActiveCategory(category)"
+                      [class.active]="stockFilterMode === 'in_stock'"
+                      (click)="setStockFilterMode('in_stock')"
                     >
-                      {{ category }}
+                      Em estoque
                     </button>
-                  }
-                </div>
+                    <button
+                      type="button"
+                      [class.active]="stockFilterMode === 'all'"
+                      (click)="setStockFilterMode('all')"
+                    >
+                      Todos
+                    </button>
+                  </div>
 
-                <div
-                  class="view-toggle stock-filter-toggle"
-                  role="group"
-                  aria-label="Filtro de estoque"
-                >
-                  <button
-                    type="button"
-                    [class.active]="stockFilterMode === 'in_stock'"
-                    (click)="setStockFilterMode('in_stock')"
+                  <div
+                    class="view-toggle quick-product-view-toggle"
+                    role="group"
+                    aria-label="Visualização dos produtos"
                   >
-                    Em estoque
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="stockFilterMode === 'all'"
-                    (click)="setStockFilterMode('all')"
-                  >
-                    Todos
-                  </button>
-                </div>
-
-                <div
-                  class="view-toggle quick-product-view-toggle"
-                  role="group"
-                  aria-label="Visualização dos produtos"
-                >
-                  <button
-                    type="button"
-                    [class.active]="productViewMode === 'lista'"
-                    (click)="setProductViewMode('lista')"
-                  >
-                    Lista
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="productViewMode === 'grid'"
-                    (click)="setProductViewMode('grid')"
-                  >
-                    Grid
-                  </button>
+                    <button
+                      type="button"
+                      [class.active]="productViewMode === 'lista'"
+                      (click)="setProductViewMode('lista')"
+                    >
+                      Lista
+                    </button>
+                    <button
+                      type="button"
+                      [class.active]="productViewMode === 'grid'"
+                      (click)="setProductViewMode('grid')"
+                    >
+                      Grid
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -344,13 +310,20 @@ interface QuickComandaWorkflowTab {
                         <article
                           class="product-card"
                           [class.selected]="isProductSelected(produto)"
-                          [class.product-card-disabled]="!canEditComanda || !hasProductStock(produto)"
+                          [class.product-card-disabled]="
+                            !canEditComanda || !hasProductStock(produto)
+                          "
                         >
                           <div>
                             <strong>{{ produto.nome }}</strong>
                             <p>{{ produto.descricao }}</p>
-                            <span class="product-size-chip quick-product-size">{{ getProdutoTamanhoLabel(produto) }}</span>
-                            <span class="stock-availability-chip" [class.out]="!hasProductStock(produto)">
+                            <span class="product-size-chip quick-product-size">{{
+                              getProdutoTamanhoLabel(produto)
+                            }}</span>
+                            <span
+                              class="stock-availability-chip"
+                              [class.out]="!hasProductStock(produto)"
+                            >
                               {{ getStockBadgeLabel(produto) }}
                             </span>
                           </div>
@@ -519,9 +492,7 @@ interface QuickComandaWorkflowTab {
                     "
                     >{{ selectedClienteLabel }}</strong
                   >
-                  <em>{{
-                    clienteMode === 'manual' ? 'Cliente não cadastrado' : 'Cliente cadastrado'
-                  }}</em>
+                  <em>{{ clienteMode === 'manual' ? 'Nome livre' : 'Cadastro vinculado' }}</em>
                 </article>
 
                 <article class="quick-summary-card">
@@ -618,10 +589,10 @@ interface QuickComandaWorkflowTab {
               <button
                 class="modal-primary-action"
                 type="button"
-                [disabled]="!canSave"
+                [disabled]="isSavingComanda"
                 (click)="saveComanda()"
               >
-                {{ primaryActionLabel }}
+                {{ isSavingComanda ? 'Salvando...' : primaryActionLabel }}
               </button>
             }
           </div>
@@ -653,10 +624,12 @@ export class QuickComandaModalComponent implements OnChanges {
   protected productViewMode: ProductViewMode = 'lista';
   protected stockFilterMode: StockFilterMode = 'in_stock';
   protected clienteMode: ClienteComandaMode = 'cadastrado';
+  protected clienteSearchTerm = '';
   protected selectedClienteId = '';
   protected manualClienteNome = '';
   protected selectedMesaId = '';
   protected errorMessage = '';
+  protected isSavingComanda = false;
   protected items: ItemComanda[] = [];
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -728,8 +701,7 @@ export class QuickComandaModalComponent implements OnChanges {
       const matchesCategory =
         this.activeCategory === 'Todos' || produto.categoria === this.activeCategory;
       const matchesSearch = this.produtosService.productMatchesSearch(produto, this.productSearch);
-      const matchesStockFilter =
-        this.stockFilterMode === 'all' || this.isProductAvailable(produto);
+      const matchesStockFilter = this.stockFilterMode === 'all' || this.isProductAvailable(produto);
 
       return matchesCategory && matchesSearch && matchesStockFilter;
     });
@@ -741,7 +713,7 @@ export class QuickComandaModalComponent implements OnChanges {
 
   protected get hasValidCustomer(): boolean {
     if (this.clienteMode === 'manual') {
-      return this.manualClienteNome.trim().length >= 2;
+      return this.getTypedClienteName().length >= 2;
     }
 
     return Boolean(this.selectedClienteId);
@@ -767,7 +739,7 @@ export class QuickComandaModalComponent implements OnChanges {
 
   protected get selectedClienteLabel(): string {
     if (this.clienteMode === 'manual') {
-      return this.manualClienteNome.trim() || 'Cliente não informado';
+      return this.getTypedClienteName() || 'Cliente não informado';
     }
 
     const cliente = this.clientes.find(
@@ -796,14 +768,22 @@ export class QuickComandaModalComponent implements OnChanges {
     this.errorMessage = '';
   }
 
-  protected onClienteModeChange(): void {
+  protected onClienteSearchChange(value: string): void {
     this.errorMessage = '';
-    if (this.clienteMode === 'manual') {
-      this.selectedClienteId = '';
+    this.clienteSearchTerm = value;
+
+    const selectedCliente = this.findClienteBySearchTerm(value);
+
+    if (selectedCliente) {
+      this.clienteMode = 'cadastrado';
+      this.selectedClienteId = selectedCliente.id;
+      this.manualClienteNome = '';
       return;
     }
 
-    this.manualClienteNome = '';
+    this.clienteMode = 'manual';
+    this.selectedClienteId = '';
+    this.manualClienteNome = value;
   }
 
   protected selectStep(step: QuickComandaStep): void {
@@ -990,7 +970,9 @@ export class QuickComandaModalComponent implements OnChanges {
       return;
     }
 
-    const produto = this.activeProducts.find((currentProduto) => currentProduto.id === itemToChange.productId);
+    const produto = this.activeProducts.find(
+      (currentProduto) => currentProduto.id === itemToChange.productId,
+    );
 
     if (
       produto &&
@@ -1033,6 +1015,10 @@ export class QuickComandaModalComponent implements OnChanges {
   protected saveComanda(): void {
     this.errorMessage = '';
 
+    if (this.isSavingComanda) {
+      return;
+    }
+
     if (!this.canEditComanda) {
       this.errorMessage = 'Esta comanda já foi finalizada e não pode mais ser alterada.';
       this.activeStep = 'resumo';
@@ -1047,19 +1033,22 @@ export class QuickComandaModalComponent implements OnChanges {
       return;
     }
 
-    const selectedCliente = this.clientes.find((cliente) => cliente.id === this.selectedClienteId);
+    const selectedCliente =
+      this.clientes.find((cliente) => cliente.id === this.selectedClienteId) ??
+      this.findClienteBySearchTerm(this.clienteSearchTerm);
     const clienteNome =
-      this.clienteMode === 'manual' ? this.manualClienteNome.trim() : selectedCliente?.nome;
+      this.clienteMode === 'manual' ? this.getTypedClienteName() : selectedCliente?.nome;
 
     if (!clienteNome) {
       this.errorMessage =
         this.clienteMode === 'manual'
-          ? 'Informe o nome do cliente não cadastrado.'
-          : 'Selecione um cliente para vincular à comanda.';
+          ? 'Informe o nome do cliente responsável.'
+          : 'Selecione um cliente ou digite um nome para a comanda.';
       this.activeStep = 'cliente';
       return;
     }
 
+    this.isSavingComanda = true;
     const payload = {
       clienteId: this.clienteMode === 'manual' ? undefined : selectedCliente?.id,
       clienteNome,
@@ -1075,12 +1064,15 @@ export class QuickComandaModalComponent implements OnChanges {
         ? this.comandasService.updateComanda(this.editingComanda.id, payload)
         : this.comandasService.createComanda(payload);
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Produto sem estoque disponível.';
+      this.isSavingComanda = false;
+      this.errorMessage =
+        error instanceof Error ? error.message : 'Produto sem estoque disponível.';
       this.activeStep = 'produtos';
       return;
     }
 
     if (!comanda) {
+      this.isSavingComanda = false;
       this.errorMessage = 'Não foi possível encontrar a comanda para edição.';
       return;
     }
@@ -1209,6 +1201,7 @@ export class QuickComandaModalComponent implements OnChanges {
 
   private initializeForm(): void {
     this.errorMessage = '';
+    this.isSavingComanda = false;
     this.activeStep = 'cliente';
     this.productSearch = '';
     this.productViewMode = 'lista';
@@ -1222,12 +1215,17 @@ export class QuickComandaModalComponent implements OnChanges {
         this.clienteMode === 'cadastrado' ? (this.editingComanda.clienteId ?? '') : '';
       this.manualClienteNome =
         this.clienteMode === 'manual' ? (this.editingComanda.clienteNome ?? '') : '';
+      this.clienteSearchTerm =
+        this.clienteMode === 'cadastrado'
+          ? this.getClienteOptionLabelById(this.selectedClienteId)
+          : this.manualClienteNome;
       this.selectedMesaId = this.editingComanda.mesaId ?? '';
       this.items = this.editingComanda.itens.map((item) => ({ ...item }));
       return;
     }
 
-    this.clienteMode = this.clientes.length === 0 ? 'manual' : 'cadastrado';
+    this.clienteMode = 'manual';
+    this.clienteSearchTerm = '';
     this.selectedClienteId = '';
     this.manualClienteNome = '';
     this.selectedMesaId = this.initialMesaId || '';
@@ -1245,10 +1243,7 @@ export class QuickComandaModalComponent implements OnChanges {
     }
 
     this.activeStep = 'cliente';
-    this.errorMessage =
-      this.clienteMode === 'manual'
-        ? 'Informe o nome do cliente não cadastrado para avançar.'
-        : 'Selecione um cliente cadastrado para avançar.';
+    this.errorMessage = 'Informe o cliente responsável para avançar.';
     return false;
   }
 
@@ -1264,5 +1259,43 @@ export class QuickComandaModalComponent implements OnChanges {
 
   private getSelectedMesa(): Mesa | undefined {
     return this.mesasDisponiveis.find((mesa) => mesa.id === this.selectedMesaId);
+  }
+
+  protected getClienteOptionLabel(cliente: Cliente): string {
+    return `${cliente.nome} - ${cliente.cpf}`;
+  }
+
+  private getClienteOptionLabelById(clienteId: string): string {
+    const cliente = this.clientes.find((currentCliente) => currentCliente.id === clienteId);
+    return cliente ? this.getClienteOptionLabel(cliente) : '';
+  }
+
+  private findClienteBySearchTerm(value: string): Cliente | undefined {
+    const normalizedValue = this.normalizeClienteSearch(value);
+
+    if (!normalizedValue) {
+      return undefined;
+    }
+
+    return this.clientes.find((cliente) => {
+      const optionLabel = this.normalizeClienteSearch(this.getClienteOptionLabel(cliente));
+      const nome = this.normalizeClienteSearch(cliente.nome);
+      const cpf = this.normalizeClienteSearch(cliente.cpf);
+
+      return optionLabel === normalizedValue || nome === normalizedValue || cpf === normalizedValue;
+    });
+  }
+
+  private getTypedClienteName(): string {
+    return this.clienteSearchTerm.trim();
+  }
+
+  private normalizeClienteSearch(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
   }
 }

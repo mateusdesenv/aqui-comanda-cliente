@@ -6,25 +6,50 @@ import { FiliaisService } from './filiais.service';
 
 const SETUP_FILIAIS_PATH = '/configuracoes/filiais';
 
-export const authGuard: CanActivateFn = () => {
+export const authGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  authService.refreshCurrentUser();
-
+  await authService.waitUntilReady();
   if (authService.isAuthenticated()) {
+    await authService.refreshCurrentUser();
     return true;
   }
 
   return router.createUrlTree(['/login']);
 };
 
-export const permissionGuard: CanActivateFn = (route, state) => {
+export const loginGuard: CanActivateFn = async () => {
+  const authService = inject(AuthService);
+  const filiaisService = inject(FiliaisService);
+  const router = inject(Router);
+
+  await authService.waitUntilReady();
+
+  if (!authService.isAuthenticated()) {
+    return true;
+  }
+
+  await filiaisService.reload().catch(() => undefined);
+  return router.createUrlTree([
+    filiaisService.hasFilialCadastrada() ? authService.getFirstAllowedPath() : SETUP_FILIAIS_PATH,
+  ]);
+};
+
+export const permissionGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const filiaisService = inject(FiliaisService);
   const router = inject(Router);
   const tela = route.data?.['tela'] as TelaSistema | undefined;
   const isFiliaisSetupRoute = state.url.startsWith(SETUP_FILIAIS_PATH);
+
+  await authService.waitUntilReady();
+  if (!authService.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
+
+  await authService.refreshCurrentUser();
+  await filiaisService.reload().catch(() => undefined);
   const hasFilialCadastrada = filiaisService.hasFilialCadastrada();
 
   if (!hasFilialCadastrada && isFiliaisSetupRoute) {

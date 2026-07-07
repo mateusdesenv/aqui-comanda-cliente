@@ -1,8 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
 
 export type UiScale = 'mini' | 'tiny' | 'small' | 'medium' | 'large';
 
-const STORAGE_KEY = 'aqui-comanda:ui-scale';
 const SCALE_CLASSES: Record<UiScale, string> = {
   mini: 'ui-scale-mini',
   tiny: 'ui-scale-tiny',
@@ -13,7 +14,8 @@ const SCALE_CLASSES: Record<UiScale, string> = {
 
 @Injectable({ providedIn: 'root' })
 export class UiSettingsService {
-  readonly scale = signal<UiScale>(this.loadFromStorage());
+  private readonly api = inject(ApiClientService);
+  readonly scale = signal<UiScale>('medium');
 
   constructor() {
     this.applyScaleClass(this.scale());
@@ -23,30 +25,22 @@ export class UiSettingsService {
     return this.scale();
   }
 
+  clearData(): void {
+    this.scale.set('medium');
+    this.applyScaleClass('medium');
+  }
+
   setScale(scale: UiScale): void {
     this.scale.set(scale);
-    this.persist(scale);
     this.applyScaleClass(scale);
+    void lastValueFrom(this.api.put<{ uiScale: UiScale }>('/configuracoes/ui', { uiScale: scale })).then((settings) => {
+      this.scale.set(settings.uiScale);
+      this.applyScaleClass(settings.uiScale);
+    });
   }
 
   loadFromStorage(): UiScale {
-    if (typeof localStorage === 'undefined') {
-      return 'medium';
-    }
-
-    const storedScale = localStorage.getItem(STORAGE_KEY);
-
-    if (
-      storedScale === 'mini' ||
-      storedScale === 'tiny' ||
-      storedScale === 'small' ||
-      storedScale === 'medium' ||
-      storedScale === 'large'
-    ) {
-      return storedScale;
-    }
-
-    return 'medium';
+    return this.scale();
   }
 
   applyScaleClass(scale: UiScale): void {
@@ -71,11 +65,10 @@ export class UiSettingsService {
     return labels[scale];
   }
 
-  private persist(scale: UiScale): void {
-    if (typeof localStorage === 'undefined') {
-      return;
-    }
-
-    localStorage.setItem(STORAGE_KEY, scale);
+  async reload(): Promise<void> {
+    const settings = await lastValueFrom(this.api.get<{ uiScale: UiScale }>('/configuracoes/ui'));
+    const scale = settings.uiScale ?? 'medium';
+    this.scale.set(scale);
+    this.applyScaleClass(scale);
   }
 }

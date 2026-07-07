@@ -138,10 +138,13 @@ type StockStatusFilter = 'todos' | 'com_estoque' | 'sem_estoque' | 'baixo';
 export class StockManagementPageComponent {
   private readonly produtosService = inject(ProdutosService);
 
-  protected produtos = this.produtosService.getProdutos();
   protected search = '';
   protected statusFilter: StockStatusFilter = 'todos';
   protected lowStockLimit = 5;
+
+  protected get produtos(): Produto[] {
+    return this.produtosService.getProdutos();
+  }
 
   protected get filteredProdutos(): Produto[] {
     const normalizedSearch = this.normalizeText(this.search);

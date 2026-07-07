@@ -3,10 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { Colaborador, NivelAcesso, PermissaoTela, TelaSistema, telasSistema } from '../models/app-data';
 import { AuthService } from '../services/auth.service';
 import { ColaboradorPayload, ColaboradoresService } from '../services/colaboradores.service';
+import { formatCpf, isValidCpf, normalizeCpf } from '../utils/cpf';
 
 interface ColaboradorFormModel {
   nome: string;
-  usuario: string;
+  cpf: string;
   senha: string;
   nivel: NivelAcesso;
   ativo: boolean;
@@ -45,7 +46,7 @@ interface ColaboradorFormModel {
         <div class="management-table colaboradores-table">
           <div class="management-table-head">
             <span>Colaborador</span>
-            <span>Usuário</span>
+            <span>CPF</span>
             <span>Nível</span>
             <span>Status</span>
             <span>Acessos</span>
@@ -55,7 +56,7 @@ interface ColaboradorFormModel {
           @for (colaborador of colaboradores; track colaborador.id) {
             <div class="management-table-row">
               <strong>{{ colaborador.nome }}</strong>
-              <span>{{ colaborador.usuario }}</span>
+              <span>{{ formatCpfValue(colaborador.cpf || colaborador.usuario) }}</span>
               <span class="status-chip">{{ colaborador.nivel === 'admin' ? 'Admin' : 'Colaborador' }}</span>
               <span class="status-chip" [class.inativa]="!colaborador.ativo">
                 {{ colaborador.ativo ? 'Ativo' : 'Inativo' }}
@@ -141,15 +142,17 @@ interface ColaboradorFormModel {
                 </label>
 
                 <label>
-                  Usuário/login
+                  CPF
                   <input
                     type="text"
-                    name="usuario"
+                    name="cpf"
                     required
+                    inputmode="numeric"
                     autocomplete="off"
-                    placeholder="Ex.: ana.caixa"
-                    [(ngModel)]="form.usuario"
-                    (ngModelChange)="clearFeedback()"
+                    maxlength="14"
+                    placeholder="000.000.000-00"
+                    [(ngModel)]="form.cpf"
+                    (ngModelChange)="onCpfChange($event)"
                   />
                 </label>
 
@@ -303,8 +306,15 @@ export class ColaboradoresPageComponent {
       return;
     }
 
-    if (!this.form.usuario.trim()) {
-      this.errorMessage = 'Informe o usuário/login.';
+    const cpf = normalizeCpf(this.form.cpf);
+
+    if (!cpf) {
+      this.errorMessage = 'CPF é obrigatório.';
+      return;
+    }
+
+    if (!isValidCpf(cpf)) {
+      this.errorMessage = 'Informe um CPF válido.';
       return;
     }
 
@@ -313,14 +323,14 @@ export class ColaboradoresPageComponent {
       return;
     }
 
-    if (this.colaboradoresService.hasUsuario(this.form.usuario, this.editingColaboradorId ?? undefined)) {
-      this.errorMessage = 'Já existe um colaborador com esse usuário/login.';
+    if (this.colaboradoresService.hasCpf(cpf, this.editingColaboradorId ?? undefined)) {
+      this.errorMessage = 'Já existe um colaborador cadastrado com este CPF.';
       return;
     }
 
     const payload: ColaboradorPayload = {
       nome: this.form.nome.trim(),
-      usuario: this.form.usuario.trim(),
+      cpf,
       senha: this.form.senha.trim() || undefined,
       nivel: this.form.nivel,
       ativo: this.form.ativo,
@@ -355,7 +365,7 @@ export class ColaboradoresPageComponent {
     this.editingColaboradorId = colaborador.id;
     this.form = {
       nome: colaborador.nome,
-      usuario: colaborador.usuario,
+      cpf: formatCpf(colaborador.cpf || colaborador.usuario),
       senha: '',
       nivel: colaborador.nivel,
       ativo: colaborador.ativo,
@@ -420,6 +430,16 @@ export class ColaboradoresPageComponent {
     this.clearFeedback();
     this.editingColaboradorId = null;
     this.form = this.createEmptyForm();
+  }
+
+  protected onCpfChange(value: string): void {
+    this.form.cpf = formatCpf(value);
+    this.clearFeedback();
+  }
+
+  protected formatCpfValue(value?: string): string {
+    const cpf = normalizeCpf(value);
+    return cpf ? formatCpf(cpf) : 'CPF não informado';
   }
 
   protected onNivelChange(nivel: NivelAcesso): void {
@@ -491,7 +511,7 @@ export class ColaboradoresPageComponent {
   private createEmptyForm(): ColaboradorFormModel {
     return {
       nome: '',
-      usuario: '',
+      cpf: '',
       senha: '',
       nivel: 'colaborador',
       ativo: true,
