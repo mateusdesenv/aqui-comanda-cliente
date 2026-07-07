@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { EnderecoFilial, Filial } from '../models/app-data';
 
@@ -13,14 +14,11 @@ export interface FilialPayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class FiliaisService {
+export class FiliaisService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
 
   readonly filiais = signal<Filial[]>([]);
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   reloadFromStorage(): void {
     void this.reload().catch(() => undefined);
@@ -39,6 +37,7 @@ export class FiliaisService {
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.filiais.set([]);
   }
 
@@ -62,7 +61,7 @@ export class FiliaisService {
     this.filiais.set(this.sortByName([...this.filiais(), filial]));
     void lastValueFrom(this.api.post<Filial>('/filiais', payload)).then((created) => {
       this.filiais.set(this.sortByName([...this.filiais().filter((item) => item.id !== filial.id), this.mapFilial(created)]));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return filial;
   }
 
@@ -93,7 +92,7 @@ export class FiliaisService {
 
     void lastValueFrom(this.api.put<Filial>(`/filiais/${id}`, payload)).then((updated) => {
       this.filiais.set(this.sortByName(this.filiais().map((filial) => (filial.id === id ? this.mapFilial(updated) : filial))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedFilial;
   }
 
@@ -120,13 +119,13 @@ export class FiliaisService {
 
     void lastValueFrom(this.api.patch<Filial>(`/filiais/${id}/status`, { ativa: (updatedFilial as Filial | null)?.ativa })).then((updated) => {
       this.filiais.set(this.sortByName(this.filiais().map((filial) => (filial.id === id ? this.mapFilial(updated) : filial))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedFilial;
   }
 
   deleteFilial(id: string): void {
     this.filiais.set(this.filiais().filter((filial) => filial.id !== id));
-    void lastValueFrom(this.api.delete(`/filiais/${id}`));
+    void lastValueFrom(this.api.delete(`/filiais/${id}`)).catch(() => this.reload().catch(() => undefined));
   }
 
   private normalizeFiliais(filiais: Filial[]): Filial[] {
@@ -168,7 +167,7 @@ export class FiliaisService {
     return [...filiais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const filiais = await lastValueFrom(this.api.list<Filial>('/filiais', { limit: 99 }));
     this.filiais.set(this.normalizeFiliais(mapApiList(filiais)));
   }

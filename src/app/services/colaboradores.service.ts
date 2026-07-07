@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Colaborador, NivelAcesso, PermissaoTela, TelaSistema, telasSistema } from '../models/app-data';
 import { normalizeCpf } from '../utils/cpf';
@@ -15,20 +16,18 @@ export interface ColaboradorPayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ColaboradoresService {
+export class ColaboradoresService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
 
   readonly colaboradores = signal<Colaborador[]>([]);
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getColaboradores(): Colaborador[] {
     return this.colaboradores();
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.colaboradores.set([]);
   }
 
@@ -76,7 +75,7 @@ export class ColaboradoresService {
     this.colaboradores.set(this.sortByName([...this.colaboradores(), colaborador]));
     void lastValueFrom(this.api.post<Colaborador>('/colaboradores', this.toApiPayload(payload))).then((created) => {
       this.colaboradores.set(this.sortByName([...this.colaboradores().filter((item) => item.id !== colaborador.id), this.mapColaborador(created)]));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return colaborador;
   }
 
@@ -109,7 +108,7 @@ export class ColaboradoresService {
 
     void lastValueFrom(this.api.put<Colaborador>(`/colaboradores/${id}`, this.toApiPayload(payload))).then((updated) => {
       this.colaboradores.set(this.sortByName(this.colaboradores().map((colaborador) => (colaborador.id === id ? this.mapColaborador(updated) : colaborador))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedColaborador;
   }
 
@@ -136,13 +135,13 @@ export class ColaboradoresService {
 
     void lastValueFrom(this.api.patch<Colaborador>(`/colaboradores/${id}/status`, { ativo: (updatedColaborador as Colaborador | null)?.ativo })).then((updated) => {
       this.colaboradores.set(this.sortByName(this.colaboradores().map((colaborador) => (colaborador.id === id ? this.mapColaborador(updated) : colaborador))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedColaborador;
   }
 
   deleteColaborador(id: string): void {
     this.colaboradores.set(this.colaboradores().filter((colaborador) => colaborador.id !== id));
-    void lastValueFrom(this.api.delete(`/colaboradores/${id}`));
+    void lastValueFrom(this.api.delete(`/colaboradores/${id}`)).catch(() => this.reload().catch(() => undefined));
   }
 
   createReadOnlyPermissoes(): PermissaoTela[] {
@@ -194,7 +193,7 @@ export class ColaboradoresService {
     return [...colaboradores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const colaboradores = await lastValueFrom(this.api.listAll<Colaborador>('/colaboradores'));
     this.colaboradores.set(this.normalizeColaboradores(mapApiList(colaboradores)));
   }

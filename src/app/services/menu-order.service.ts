@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { TelaSistema } from '../models/app-data';
 import type { IconName } from '../components/icon.component';
 
@@ -87,15 +88,12 @@ export const defaultMenuItems: NavigationMenuItem[] = [
 ];
 
 @Injectable({ providedIn: 'root' })
-export class MenuOrderService {
+export class MenuOrderService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
   private readonly order = signal<string[]>([]);
 
   readonly menuItems = computed(() => this.applyOrder(defaultMenuItems, this.order()));
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getDefaultMenuItems(): NavigationMenuItem[] {
     return [...defaultMenuItems];
@@ -106,6 +104,7 @@ export class MenuOrderService {
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.order.set([]);
   }
 
@@ -114,12 +113,13 @@ export class MenuOrderService {
     this.order.set(normalizedOrder);
     void lastValueFrom(this.api.put<{ menuOrder: string[] }>('/configuracoes/menu-order', { menuOrder: normalizedOrder })).then((settings) => {
       this.order.set(this.normalizeOrder(settings.menuOrder ?? []));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
   }
 
   restoreDefaultOrder(): void {
     this.order.set([]);
-    void lastValueFrom(this.api.put<{ menuOrder: string[] }>('/configuracoes/menu-order', { menuOrder: [] }));
+    void lastValueFrom(this.api.put<{ menuOrder: string[] }>('/configuracoes/menu-order', { menuOrder: [] }))
+      .catch(() => this.reload().catch(() => undefined));
   }
 
   private applyOrder(menuItems: NavigationMenuItem[], order: string[]): NavigationMenuItem[] {
@@ -150,7 +150,7 @@ export class MenuOrderService {
     return normalizedOrder;
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const settings = await lastValueFrom(this.api.get<{ menuOrder: string[] }>('/configuracoes/menu-order'));
     this.order.set(this.normalizeOrder(settings.menuOrder ?? []));
   }

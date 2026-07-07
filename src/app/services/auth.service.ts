@@ -21,7 +21,6 @@ import { ColaboradoresService } from './colaboradores.service';
 import { ComandasService } from './comandas.service';
 import { ClientesService } from './clientes.service';
 import { FiliaisService } from './filiais.service';
-import { ImportExportService } from './import-export.service';
 import { MenuOrderService } from './menu-order.service';
 import { MesasService } from './mesas.service';
 import { PedidosService } from './pedidos.service';
@@ -45,7 +44,6 @@ export class AuthService {
   private readonly comandasService = inject(ComandasService);
   private readonly clientesService = inject(ClientesService);
   private readonly filiaisService = inject(FiliaisService);
-  private readonly importExportService = inject(ImportExportService);
   private readonly menuOrderService = inject(MenuOrderService);
   private readonly mesasService = inject(MesasService);
   private readonly pedidosService = inject(PedidosService);
@@ -58,6 +56,7 @@ export class AuthService {
   private readonly currentMembership = signal<Colaborador | null>(null);
   private readonly authReady = signal(false);
   private readonly authReadyPromise: Promise<void>;
+  private loadedTenantDataForUid: string | null = null;
 
   readonly user = computed<AuthenticatedUser | null>(() => {
     const user = this.currentFirebaseUser();
@@ -179,7 +178,7 @@ export class AuthService {
     return this.registerWithEmail(name, email, password);
   }
 
-  async refreshCurrentUser(): Promise<void> {
+  async refreshCurrentUser(options: { reloadTenantData?: boolean } = {}): Promise<void> {
     const firebaseUser = this.currentFirebaseUser();
 
     if (!firebaseUser) {
@@ -189,7 +188,9 @@ export class AuthService {
 
     try {
       this.currentMembership.set(await this.loadApiProfile());
-      await this.reloadTenantData();
+      if (options.reloadTenantData) {
+        await this.reloadTenantData();
+      }
     } catch (error) {
       console.warn('Não foi possível recarregar o perfil da API.', error);
       this.currentMembership.set(null);
@@ -310,12 +311,12 @@ export class AuthService {
   }
 
   private clearTenantData(): void {
+    this.loadedTenantDataForUid = null;
     this.caixaService.clearData();
     this.comandasService.clearData();
     this.clientesService.clearData();
     this.colaboradoresService.clearData();
     this.filiaisService.clearData();
-    this.importExportService.clearData();
     this.menuOrderService.clearData();
     this.mesasService.clearData();
     this.pedidosService.clearData();
@@ -325,20 +326,28 @@ export class AuthService {
   }
 
   private async reloadTenantData(): Promise<void> {
-    await this.filiaisService.reload();
+    const uid = this.currentFirebaseUser()?.uid;
+
+    if (uid && this.loadedTenantDataForUid === uid) {
+      return;
+    }
+
+    await this.filiaisService.ensureLoaded();
 
     await Promise.all([
-      this.caixaService.reload().catch(() => undefined),
-      this.comandasService.reload().catch(() => undefined),
-      this.clientesService.reload().catch(() => undefined),
-      this.colaboradoresService.reload().catch(() => undefined),
-      this.menuOrderService.reload().catch(() => undefined),
-      this.mesasService.reload().catch(() => undefined),
-      this.pedidosService.reload().catch(() => undefined),
-      this.produtosService.reload().catch(() => undefined),
-      this.stockEntriesService.reload().catch(() => undefined),
-      this.uiSettingsService.reload().catch(() => undefined),
+      this.caixaService.ensureLoaded().catch(() => undefined),
+      this.comandasService.ensureLoaded().catch(() => undefined),
+      this.clientesService.ensureLoaded().catch(() => undefined),
+      this.colaboradoresService.ensureLoaded().catch(() => undefined),
+      this.menuOrderService.ensureLoaded().catch(() => undefined),
+      this.mesasService.ensureLoaded().catch(() => undefined),
+      this.pedidosService.ensureLoaded().catch(() => undefined),
+      this.produtosService.ensureLoaded().catch(() => undefined),
+      this.stockEntriesService.ensureLoaded().catch(() => undefined),
+      this.uiSettingsService.ensureLoaded().catch(() => undefined),
     ]);
+
+    this.loadedTenantDataForUid = uid ?? null;
   }
 
   private async loadApiProfile(): Promise<Colaborador | null> {
