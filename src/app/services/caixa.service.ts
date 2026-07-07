@@ -1,19 +1,17 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
-import { Colaborador, Comanda, EntradaCaixa, Mesa, SessaoCaixa } from '../models/app-data';
+import { Colaborador, EntradaCaixa, SessaoCaixa } from '../models/app-data';
 
 @Injectable({ providedIn: 'root' })
-export class CaixaService {
+export class CaixaService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
 
   readonly entradas = signal<EntradaCaixa[]>([]);
   readonly sessoes = signal<SessaoCaixa[]>([]);
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getEntradas(): EntradaCaixa[] {
     return this.entradas();
@@ -24,6 +22,7 @@ export class CaixaService {
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.entradas.set([]);
     this.sessoes.set([]);
   }
@@ -54,7 +53,9 @@ export class CaixaService {
     };
 
     this.sessoes.set([sessao, ...this.sessoes()]);
-    void lastValueFrom(this.api.post<SessaoCaixa>('/caixa/sessoes/abrir', { observacaoAbertura })).then(async () => this.reload());
+    void lastValueFrom(this.api.post<SessaoCaixa>('/caixa/sessoes/abrir', { observacaoAbertura }))
+      .then(async () => this.reload())
+      .catch(() => this.reload().catch(() => undefined));
     return sessao;
   }
 
@@ -82,7 +83,9 @@ export class CaixaService {
     this.sessoes.set(
       this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? sessaoFechada : sessao)),
     );
-    void lastValueFrom(this.api.post<SessaoCaixa>(`/caixa/sessoes/${sessaoAberta.id}/fechar`, { observacaoFechamento })).then(async () => this.reload());
+    void lastValueFrom(this.api.post<SessaoCaixa>(`/caixa/sessoes/${sessaoAberta.id}/fechar`, { observacaoFechamento }))
+      .then(async () => this.reload())
+      .catch(() => this.reload().catch(() => undefined));
     return sessaoFechada;
   }
 
@@ -117,72 +120,6 @@ export class CaixaService {
 
   hasEntradaForComanda(comandaId: string): boolean {
     return this.entradas().some((entrada) => entrada.tipo === 'comanda' && entrada.origemId === comandaId);
-  }
-
-  registrarEntradaComanda(comanda: Comanda, mesa?: Mesa | null): EntradaCaixa | null {
-    const sessaoAberta = this.getSessaoAberta();
-
-    if (!sessaoAberta) {
-      return null;
-    }
-
-    if (!this.isComandaPaga(comanda)) {
-      return null;
-    }
-
-    if (this.hasEntradaForComanda(comanda.id)) {
-      return null;
-    }
-
-    const valor = comanda.totalFinalizado ?? comanda.total ?? 0;
-
-    if (valor <= 0) {
-      return null;
-    }
-
-    const now = new Date().toISOString();
-    const mesaLabel = mesa ? `Mesa ${String(mesa.numero).padStart(2, '0')}` : '';
-    const clienteLabel = comanda.clienteNome || 'Cliente não informado';
-
-    const entrada: EntradaCaixa = {
-      id: `entrada-comanda-${comanda.id}-${Date.now()}`,
-      tipo: 'comanda',
-      origemId: comanda.id,
-      origemDescricao: mesa
-        ? `Comanda ${this.getShortId(comanda.id)} - ${mesaLabel}`
-        : `Comanda rápida - ${clienteLabel}`,
-      clienteId: comanda.clienteId,
-      clienteNome: clienteLabel,
-      mesaId: comanda.mesaId ?? null,
-      mesaNumero: mesa?.numero ?? null,
-      valor,
-      formaPagamento: 'Não informado',
-      sessaoCaixaId: sessaoAberta.id,
-      criadaEm: now,
-      comandaFinalizadaEm: comanda.finalizadaEm ?? now,
-    };
-
-    void this.reload();
-    return entrada;
-  }
-
-  private recalcularSessaoAberta(): void {
-    const sessaoAberta = this.getSessaoAberta();
-
-    if (!sessaoAberta) {
-      return;
-    }
-
-    const entradasDaSessao = this.getEntradasBySessao(sessaoAberta.id);
-    const updatedSessao: SessaoCaixa = {
-      ...sessaoAberta,
-      totalEntradas: this.getTotalRecebido(entradasDaSessao),
-      quantidadeEntradas: entradasDaSessao.length,
-    };
-
-    this.sessoes.set(
-      this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? updatedSessao : sessao)),
-    );
   }
 
   private normalizeEntradas(entradas: EntradaCaixa[]): EntradaCaixa[] {
@@ -250,20 +187,11 @@ export class CaixaService {
     );
   }
 
-  private isComandaPaga(comanda: Comanda): boolean {
-    return comanda.status === 'finalizada' && comanda.paga;
-  }
-
   private getDateKey(date: Date): string {
     return [date.getFullYear(), date.getMonth(), date.getDate()].join('-');
   }
 
-  private getShortId(id: string): string {
-    const parts = id.split('-').filter(Boolean);
-    return parts.slice(-2).join('-') || id;
-  }
-
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const [sessoes, entradas] = await Promise.all([
       lastValueFrom(this.api.listAll<SessaoCaixa>('/caixa/sessoes')),
       lastValueFrom(this.api.listAll<EntradaCaixa>('/caixa/entradas')),

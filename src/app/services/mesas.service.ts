@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Mesa, MesaStatus } from '../models/app-data';
 
@@ -13,20 +14,18 @@ export interface MesaPayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class MesasService {
+export class MesasService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
 
   readonly mesas = signal<Mesa[]>([]);
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getMesas(): Mesa[] {
     return this.mesas();
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.mesas.set([]);
   }
 
@@ -42,7 +41,7 @@ export class MesasService {
     this.mesas.set(this.sortMesas([...this.mesas(), mesa]));
     void lastValueFrom(this.api.post<Mesa>('/mesas', payload)).then((created) => {
       this.mesas.set(this.sortMesas([...this.mesas().filter((item) => item.id !== mesa.id), this.mapMesa(created)]));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return mesa;
   }
 
@@ -62,13 +61,13 @@ export class MesasService {
     this.mesas.set(this.sortMesas(mesas));
     void lastValueFrom(this.api.put<Mesa>(`/mesas/${id}`, payload)).then((updated) => {
       this.mesas.set(this.sortMesas(this.mesas().map((mesa) => (mesa.id === id ? this.mapMesa(updated) : mesa))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedMesa;
   }
 
   deleteMesa(id: string): void {
     this.mesas.set(this.mesas().filter((mesa) => mesa.id !== id));
-    void lastValueFrom(this.api.delete(`/mesas/${id}`));
+    void lastValueFrom(this.api.delete(`/mesas/${id}`)).catch(() => this.reload().catch(() => undefined));
   }
 
   private normalizeMesas(mesas: Mesa[]): Mesa[] {
@@ -86,7 +85,7 @@ export class MesasService {
     return `mesa-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const mesas = await lastValueFrom(this.api.listAll<Mesa>('/mesas'));
     this.mesas.set(this.sortMesas(this.normalizeMesas(mapApiList(mesas).map((mesa) => this.mapMesa(mesa)))));
   }

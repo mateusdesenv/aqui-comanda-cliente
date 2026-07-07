@@ -12,7 +12,6 @@ export const authGuard: CanActivateFn = async () => {
 
   await authService.waitUntilReady();
   if (authService.isAuthenticated()) {
-    await authService.refreshCurrentUser();
     return true;
   }
 
@@ -30,7 +29,7 @@ export const loginGuard: CanActivateFn = async () => {
     return true;
   }
 
-  await filiaisService.reload().catch(() => undefined);
+  await filiaisService.ensureLoaded().catch(() => undefined);
   return router.createUrlTree([
     filiaisService.hasFilialCadastrada() ? authService.getFirstAllowedPath() : SETUP_FILIAIS_PATH,
   ]);
@@ -48,8 +47,7 @@ export const permissionGuard: CanActivateFn = async (route, state) => {
     return router.createUrlTree(['/login']);
   }
 
-  await authService.refreshCurrentUser();
-  await filiaisService.reload().catch(() => undefined);
+  await filiaisService.ensureLoaded().catch(() => undefined);
   const hasFilialCadastrada = filiaisService.hasFilialCadastrada();
 
   if (!hasFilialCadastrada && isFiliaisSetupRoute) {

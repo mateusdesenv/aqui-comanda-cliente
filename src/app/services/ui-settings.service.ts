@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 
 export type UiScale = 'mini' | 'tiny' | 'small' | 'medium' | 'large';
 
@@ -13,11 +14,12 @@ const SCALE_CLASSES: Record<UiScale, string> = {
 };
 
 @Injectable({ providedIn: 'root' })
-export class UiSettingsService {
+export class UiSettingsService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
   readonly scale = signal<UiScale>('medium');
 
   constructor() {
+    super();
     this.applyScaleClass(this.scale());
   }
 
@@ -26,6 +28,7 @@ export class UiSettingsService {
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.scale.set('medium');
     this.applyScaleClass('medium');
   }
@@ -36,7 +39,7 @@ export class UiSettingsService {
     void lastValueFrom(this.api.put<{ uiScale: UiScale }>('/configuracoes/ui', { uiScale: scale })).then((settings) => {
       this.scale.set(settings.uiScale);
       this.applyScaleClass(settings.uiScale);
-    });
+    }).catch(() => this.reload().catch(() => undefined));
   }
 
   loadFromStorage(): UiScale {
@@ -65,7 +68,7 @@ export class UiSettingsService {
     return labels[scale];
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const settings = await lastValueFrom(this.api.get<{ uiScale: UiScale }>('/configuracoes/ui'));
     const scale = settings.uiScale ?? 'medium';
     this.scale.set(scale);

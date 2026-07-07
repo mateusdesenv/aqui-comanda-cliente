@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Comanda, ItemComanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
 import { CaixaService } from './caixa.service';
@@ -16,7 +17,7 @@ interface SaveComandaPayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ComandasService {
+export class ComandasService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
   private readonly caixaService = inject(CaixaService);
   private readonly mesasService = inject(MesasService);
@@ -33,15 +34,13 @@ export class ComandasService {
     this.comandasAbertas().filter((comanda) => !comanda.mesaId),
   );
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getComandas(): Comanda[] {
     return this.comandas();
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.comandas.set([]);
   }
 
@@ -102,7 +101,9 @@ export class ComandasService {
           : comanda,
       ),
     );
-    void lastValueFrom(this.api.post(`/mesas/${mesaId}/liberar`, {})).then(async () => this.reload());
+    void lastValueFrom(this.api.post(`/mesas/${mesaId}/liberar`, {}))
+      .then(async () => this.reload())
+      .catch(() => this.reloadDependents());
     return true;
   }
 
@@ -141,7 +142,7 @@ export class ComandasService {
     void lastValueFrom(this.api.post<Comanda>('/comandas', payload)).then(async (created) => {
       this.comandas.set([...this.comandas().filter((item) => item.id !== comanda.id), this.mapComanda(created)]);
       await this.reloadDependents();
-    });
+    }).catch(() => this.reloadDependents());
     return comanda;
   }
 
@@ -189,7 +190,7 @@ export class ComandasService {
     void lastValueFrom(this.api.put<Comanda>(`/comandas/${comandaId}`, payload)).then(async (updated) => {
       this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(updated) : comanda)));
       await this.reloadDependents();
-    });
+    }).catch(() => this.reloadDependents());
     return updatedComanda;
   }
 
@@ -220,7 +221,7 @@ export class ComandasService {
     void lastValueFrom(this.api.patch<Comanda>(`/comandas/${comandaId}/itens`, { items: updatedItems })).then(async (updated) => {
       this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(updated) : comanda)));
       await this.reloadDependents();
-    });
+    }).catch(() => this.reloadDependents());
     return true;
   }
 
@@ -260,7 +261,7 @@ export class ComandasService {
     void lastValueFrom(this.api.post<Comanda>(`/comandas/${comandaId}/finalizar`, {})).then(async (finalized) => {
       this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(finalized) : comanda)));
       await this.reloadDependents();
-    });
+    }).catch(() => this.reloadDependents());
     return finalizedComanda;
   }
 
@@ -283,7 +284,9 @@ export class ComandasService {
 
     this.validateAndApplyStockDelta(existingComanda.itens ?? [], []);
     this.comandas.set(this.comandas().filter((comanda) => comanda.id !== comandaId));
-    void lastValueFrom(this.api.delete(`/comandas/${comandaId}`)).then(async () => this.reloadDependents());
+    void lastValueFrom(this.api.delete(`/comandas/${comandaId}`))
+      .then(async () => this.reloadDependents())
+      .catch(() => this.reloadDependents());
   }
 
   getCardForMesa(mesa: Mesa): MapaMesaCard {
@@ -440,7 +443,7 @@ export class ComandasService {
     return quantities;
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const comandas = await lastValueFrom(this.api.listAll<Comanda>('/comandas'));
     this.comandas.set(this.normalizeComandas(mapApiList(comandas)));
   }

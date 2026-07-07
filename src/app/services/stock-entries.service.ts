@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { friendlyApiError, mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { StockEntry } from '../models/app-data';
 import { ProdutosService } from './produtos.service';
@@ -19,21 +20,19 @@ export interface StockEntryPayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class StockEntriesService {
+export class StockEntriesService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
   private readonly produtosService = inject(ProdutosService);
 
   readonly stockEntries = signal<StockEntry[]>([]);
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getStockEntries(): StockEntry[] {
     return this.stockEntries();
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.stockEntries.set([]);
   }
 
@@ -155,7 +154,7 @@ export class StockEntriesService {
     );
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const entries = await lastValueFrom(this.api.listAll<StockEntry>('/estoque/entradas'));
     this.stockEntries.set(this.sortEntries(this.normalizeEntries(mapApiList(entries))));
   }

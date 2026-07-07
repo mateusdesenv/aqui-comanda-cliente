@@ -1,48 +1,35 @@
 import { Routes } from '@angular/router';
-import { AppLayoutComponent } from './components/app-layout.component';
-import { CaixaPageComponent } from './pages/caixa-page.component';
-import { CardapioPageComponent } from './pages/cardapio-page.component';
-import { ClientesPageComponent } from './pages/clientes-page.component';
-import { ColaboradoresPageComponent } from './pages/colaboradores-page.component';
-import { ConstructionPageComponent } from './pages/construction-page.component';
-import { ConfiguracoesPageComponent } from './pages/configuracoes-page.component';
-import { DashboardPageComponent } from './pages/dashboard-page.component';
-import { FiliaisPageComponent } from './pages/filiais-page.component';
-import { ImportarExportarPageComponent } from './pages/importar-exportar-page.component';
-import { OrdemMenuPageComponent } from './pages/ordem-menu-page.component';
-import { LoginPageComponent } from './pages/login-page.component';
-import { MapaComandasPageComponent } from './pages/mapa-comandas-page.component';
-import { MesasPageComponent } from './pages/mesas-page.component';
-import { PedidosPageComponent } from './pages/pedidos-page.component';
-import { StockManagementPageComponent } from './pages/stock-management-page.component';
-import { StockEntriesPageComponent } from './pages/stock-entries-page.component';
 import { authGuard, loginGuard, permissionGuard } from './services/auth.guard';
 
 export const routes: Routes = [
-  { path: 'login', component: LoginPageComponent, canActivate: [loginGuard] },
+  {
+    path: 'login',
+    loadComponent: () => import('./pages/login-page.component').then((module) => module.LoginPageComponent),
+    canActivate: [loginGuard],
+  },
   {
     path: '',
-    component: AppLayoutComponent,
+    loadComponent: () => import('./components/app-layout.component').then((module) => module.AppLayoutComponent),
     canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-      { path: 'dashboard', component: DashboardPageComponent, canActivate: [permissionGuard], data: { tela: 'dashboard' } },
-      { path: 'mapa', component: MapaComandasPageComponent, canActivate: [permissionGuard], data: { tela: 'mapa' } },
-      { path: 'comandas', component: ConstructionPageComponent, canActivate: [permissionGuard], data: { tela: 'comandas', title: 'Comandas' } },
-      { path: 'mesas', component: MesasPageComponent, canActivate: [permissionGuard], data: { tela: 'mesas' } },
-      { path: 'clientes', component: ClientesPageComponent, canActivate: [permissionGuard], data: { tela: 'clientes' } },
-      { path: 'pedidos', component: PedidosPageComponent, canActivate: [permissionGuard], data: { tela: 'pedidos' } },
-      { path: 'colaboradores', component: ColaboradoresPageComponent, canActivate: [permissionGuard], data: { tela: 'colaboradores' } },
-      { path: 'caixa', component: CaixaPageComponent, canActivate: [permissionGuard], data: { tela: 'caixa' } },
-      { path: 'cardapio', component: CardapioPageComponent, canActivate: [permissionGuard], data: { tela: 'cardapio' } },
-      { path: 'estoque/gestao', component: StockManagementPageComponent, canActivate: [permissionGuard], data: { tela: 'estoque' } },
-      { path: 'estoque/entradas', component: StockEntriesPageComponent, canActivate: [permissionGuard], data: { tela: 'estoque' } },
-      { path: 'relatorios', component: ConstructionPageComponent, canActivate: [permissionGuard], data: { tela: 'relatorios', title: 'Relatórios' } },
+      { path: 'dashboard', loadComponent: () => import('./pages/dashboard-page.component').then((module) => module.DashboardPageComponent), canActivate: [permissionGuard], data: { tela: 'dashboard' } },
+      { path: 'mapa', loadComponent: () => import('./pages/mapa-comandas-page.component').then((module) => module.MapaComandasPageComponent), canActivate: [permissionGuard], data: { tela: 'mapa' } },
+      { path: 'comandas', loadComponent: () => import('./pages/construction-page.component').then((module) => module.ConstructionPageComponent), canActivate: [permissionGuard], data: { tela: 'comandas', title: 'Comandas' } },
+      { path: 'mesas', loadComponent: () => import('./pages/mesas-page.component').then((module) => module.MesasPageComponent), canActivate: [permissionGuard], data: { tela: 'mesas' } },
+      { path: 'clientes', loadComponent: () => import('./pages/clientes-page.component').then((module) => module.ClientesPageComponent), canActivate: [permissionGuard], data: { tela: 'clientes' } },
+      { path: 'pedidos', loadComponent: () => import('./pages/pedidos-page.component').then((module) => module.PedidosPageComponent), canActivate: [permissionGuard], data: { tela: 'pedidos' } },
+      { path: 'colaboradores', loadComponent: () => import('./pages/colaboradores-page.component').then((module) => module.ColaboradoresPageComponent), canActivate: [permissionGuard], data: { tela: 'colaboradores' } },
+      { path: 'caixa', loadComponent: () => import('./pages/caixa-page.component').then((module) => module.CaixaPageComponent), canActivate: [permissionGuard], data: { tela: 'caixa' } },
+      { path: 'cardapio', loadComponent: () => import('./pages/cardapio-page.component').then((module) => module.CardapioPageComponent), canActivate: [permissionGuard], data: { tela: 'cardapio' } },
+      { path: 'estoque/gestao', loadComponent: () => import('./pages/stock-management-page.component').then((module) => module.StockManagementPageComponent), canActivate: [permissionGuard], data: { tela: 'estoque' } },
+      { path: 'estoque/entradas', loadComponent: () => import('./pages/stock-entries-page.component').then((module) => module.StockEntriesPageComponent), canActivate: [permissionGuard], data: { tela: 'estoque' } },
+      { path: 'relatorios', loadComponent: () => import('./pages/construction-page.component').then((module) => module.ConstructionPageComponent), canActivate: [permissionGuard], data: { tela: 'relatorios', title: 'Relatórios' } },
       { path: 'configuracoes', pathMatch: 'full', redirectTo: 'configuracoes/personalizacoes' },
-      { path: 'configuracoes/personalizacoes', component: ConfiguracoesPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
-      { path: 'configuracoes/ordem-menu', component: OrdemMenuPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
-      { path: 'configuracoes/filiais', component: FiliaisPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
-      { path: 'configuracoes/importar-exportar', component: ImportarExportarPageComponent, canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/personalizacoes', loadComponent: () => import('./pages/configuracoes-page.component').then((module) => module.ConfiguracoesPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/ordem-menu', loadComponent: () => import('./pages/ordem-menu-page.component').then((module) => module.OrdemMenuPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/filiais', loadComponent: () => import('./pages/filiais-page.component').then((module) => module.FiliaisPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/importar-exportar', loadComponent: () => import('./pages/importar-exportar-page.component').then((module) => module.ImportarExportarPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
     ],
   },
   { path: '**', redirectTo: 'mapa' },
