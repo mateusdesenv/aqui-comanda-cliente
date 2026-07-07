@@ -1,7 +1,7 @@
 export const environment = {
-  production: false,
-  apiUrl: 'https://aqui-comanda-api.vercel.app/api',
-  printerApiUrl: 'http://localhost:3334',
+  production: true,
+  apiUrl: 'https://URL-DA-AQUI-COMANDA-API/api',
+  printerApiUrl: 'http://localhost:3333',
   firebase: {
     apiKey: 'AIzaSyDJ7aYtEOy1K2aw9w3EK8UTpHzl5LwXKO8',
     authDomain: 'aqui-comanda.firebaseapp.com',

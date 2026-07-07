@@ -1,10 +1,13 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Colaborador, NivelAcesso, PermissaoTela, TelaSistema, telasSistema } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
+import { normalizeCpf } from '../utils/cpf';
 
 export interface ColaboradorPayload {
   nome: string;
-  usuario: string;
+  cpf: string;
   senha?: string;
   nivel: NivelAcesso;
   ativo: boolean;
@@ -13,48 +16,45 @@ export interface ColaboradorPayload {
 
 @Injectable({ providedIn: 'root' })
 export class ColaboradoresService {
-  private readonly repository = new LocalStorageRepository<Colaborador[]>(
-    'aqui-comanda:colaboradores',
-    [],
-  );
+  private readonly api = inject(ApiClientService);
 
-  readonly colaboradores = signal<Colaborador[]>(this.normalizeColaboradores(this.repository.read()));
+  readonly colaboradores = signal<Colaborador[]>([]);
 
   constructor() {
-    if (this.colaboradores().length === 0) {
-      this.colaboradores.set([this.createDefaultAdmin()]);
-    }
-
-    this.persist();
+    void this.reload().catch(() => undefined);
   }
 
   getColaboradores(): Colaborador[] {
     return this.colaboradores();
   }
 
+  clearData(): void {
+    this.colaboradores.set([]);
+  }
+
   getColaboradorById(id: string): Colaborador | null {
     return this.colaboradores().find((colaborador) => colaborador.id === id) ?? null;
   }
 
-  authenticate(usuario: string, senha: string): Colaborador | null {
-    const normalizedUsuario = usuario.trim().toLowerCase();
+  authenticate(cpf: string, senha: string): Colaborador | null {
+    const normalizedCpf = normalizeCpf(cpf);
 
     return (
       this.colaboradores().find(
         (colaborador) =>
           colaborador.ativo &&
-          colaborador.usuario.trim().toLowerCase() === normalizedUsuario &&
+          normalizeCpf(colaborador.cpf ?? colaborador.usuario) === normalizedCpf &&
           colaborador.senha === senha,
       ) ?? null
     );
   }
 
-  hasUsuario(usuario: string, ignoreId?: string): boolean {
-    const normalizedUsuario = usuario.trim().toLowerCase();
+  hasCpf(cpf: string, ignoreId?: string): boolean {
+    const normalizedCpf = normalizeCpf(cpf);
 
     return this.colaboradores().some(
       (colaborador) =>
-        colaborador.id !== ignoreId && colaborador.usuario.trim().toLowerCase() === normalizedUsuario,
+        colaborador.id !== ignoreId && normalizeCpf(colaborador.cpf ?? colaborador.usuario) === normalizedCpf,
     );
   }
 
@@ -63,7 +63,8 @@ export class ColaboradoresService {
     const colaborador: Colaborador = {
       id: this.createId(),
       nome: payload.nome,
-      usuario: payload.usuario,
+      cpf: normalizeCpf(payload.cpf),
+      usuario: normalizeCpf(payload.cpf),
       senha: payload.senha ?? '',
       nivel: payload.nivel,
       ativo: payload.ativo,
@@ -73,7 +74,9 @@ export class ColaboradoresService {
     };
 
     this.colaboradores.set(this.sortByName([...this.colaboradores(), colaborador]));
-    this.persist();
+    void lastValueFrom(this.api.post<Colaborador>('/colaboradores', this.toApiPayload(payload))).then((created) => {
+      this.colaboradores.set(this.sortByName([...this.colaboradores().filter((item) => item.id !== colaborador.id), this.mapColaborador(created)]));
+    });
     return colaborador;
   }
 
@@ -90,7 +93,8 @@ export class ColaboradoresService {
           updatedColaborador = {
             ...colaborador,
             nome: payload.nome,
-            usuario: payload.usuario,
+            cpf: normalizeCpf(payload.cpf),
+            usuario: normalizeCpf(payload.cpf),
             senha: payload.senha ? payload.senha : colaborador.senha,
             nivel: payload.nivel,
             ativo: payload.ativo,
@@ -103,7 +107,9 @@ export class ColaboradoresService {
       ),
     );
 
-    this.persist();
+    void lastValueFrom(this.api.put<Colaborador>(`/colaboradores/${id}`, this.toApiPayload(payload))).then((updated) => {
+      this.colaboradores.set(this.sortByName(this.colaboradores().map((colaborador) => (colaborador.id === id ? this.mapColaborador(updated) : colaborador))));
+    });
     return updatedColaborador;
   }
 
@@ -128,13 +134,15 @@ export class ColaboradoresService {
       ),
     );
 
-    this.persist();
+    void lastValueFrom(this.api.patch<Colaborador>(`/colaboradores/${id}/status`, { ativo: (updatedColaborador as Colaborador | null)?.ativo })).then((updated) => {
+      this.colaboradores.set(this.sortByName(this.colaboradores().map((colaborador) => (colaborador.id === id ? this.mapColaborador(updated) : colaborador))));
+    });
     return updatedColaborador;
   }
 
   deleteColaborador(id: string): void {
     this.colaboradores.set(this.colaboradores().filter((colaborador) => colaborador.id !== id));
-    this.persist();
+    void lastValueFrom(this.api.delete(`/colaboradores/${id}`));
   }
 
   createReadOnlyPermissoes(): PermissaoTela[] {
@@ -166,33 +174,16 @@ export class ColaboradoresService {
   private normalizeColaboradores(colaboradores: Colaborador[]): Colaborador[] {
     return this.sortByName(
       colaboradores.map((colaborador) => ({
-        ...colaborador,
-        nivel: colaborador.nivel ?? 'colaborador',
+        ...mapApiEntity(colaborador),
+        cpf: normalizeCpf(colaborador.cpf ?? (colaborador as Colaborador & { usuario?: string }).usuario),
+        usuario: normalizeCpf(colaborador.cpf ?? colaborador.usuario) || ((colaborador as Colaborador & { email?: string }).email ?? ''),
+        senha: colaborador.senha ?? '',
+        nivel: colaborador.nivel ?? (colaborador as Colaborador & { role?: NivelAcesso }).role ?? 'colaborador',
         ativo: colaborador.ativo ?? true,
         permissoes: this.normalizePermissoes(colaborador.permissoes ?? [], colaborador.nivel ?? 'colaborador'),
         criadoEm: colaborador.criadoEm ?? new Date().toISOString(),
       })),
     );
-  }
-
-  private createDefaultAdmin(): Colaborador {
-    const now = new Date().toISOString();
-
-    return {
-      id: 'admin-default',
-      nome: 'Administrador',
-      usuario: 'admin',
-      senha: 'admin',
-      nivel: 'admin',
-      ativo: true,
-      permissoes: this.createFullPermissoes(),
-      criadoEm: now,
-      atualizadoEm: now,
-    };
-  }
-
-  private persist(): void {
-    this.repository.write(this.colaboradores());
   }
 
   private createId(): string {
@@ -201,5 +192,26 @@ export class ColaboradoresService {
 
   private sortByName(colaboradores: Colaborador[]): Colaborador[] {
     return [...colaboradores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
+
+  async reload(): Promise<void> {
+    const colaboradores = await lastValueFrom(this.api.listAll<Colaborador>('/colaboradores'));
+    this.colaboradores.set(this.normalizeColaboradores(mapApiList(colaboradores)));
+  }
+
+  private mapColaborador(colaborador: Colaborador): Colaborador {
+    return this.normalizeColaboradores([colaborador])[0];
+  }
+
+  private toApiPayload(payload: ColaboradorPayload): Record<string, unknown> {
+    return {
+      nome: payload.nome,
+      cpf: normalizeCpf(payload.cpf),
+      role: payload.nivel,
+      nivel: payload.nivel,
+      ativo: payload.ativo,
+      permissoes: this.normalizePermissoes(payload.permissoes, payload.nivel),
+      senha: payload.senha,
+    };
   }
 }

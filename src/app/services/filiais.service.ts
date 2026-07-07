@@ -1,6 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { EnderecoFilial, Filial } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
 
 export interface FilialPayload {
   nome: string;
@@ -12,25 +14,16 @@ export interface FilialPayload {
 
 @Injectable({ providedIn: 'root' })
 export class FiliaisService {
-  private readonly storageKey = 'aqui-comanda:filiais';
-  private readonly repository = new LocalStorageRepository<Filial[]>(this.storageKey, []);
+  private readonly api = inject(ApiClientService);
 
-  readonly filiais = signal<Filial[]>(this.normalizeFiliais(this.repository.read()));
+  readonly filiais = signal<Filial[]>([]);
 
   constructor() {
-    this.persist();
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', (event) => {
-        if (event.key === this.storageKey) {
-          this.reloadFromStorage();
-        }
-      });
-    }
+    void this.reload().catch(() => undefined);
   }
 
   reloadFromStorage(): void {
-    this.filiais.set(this.normalizeFiliais(this.repository.read()));
+    void this.reload().catch(() => undefined);
   }
 
   hasFilialCadastrada(): boolean {
@@ -43,6 +36,10 @@ export class FiliaisService {
 
   getFiliais(): Filial[] {
     return this.filiais();
+  }
+
+  clearData(): void {
+    this.filiais.set([]);
   }
 
   getFilialById(id: string): Filial | null {
@@ -63,7 +60,9 @@ export class FiliaisService {
     };
 
     this.filiais.set(this.sortByName([...this.filiais(), filial]));
-    this.persist();
+    void lastValueFrom(this.api.post<Filial>('/filiais', payload)).then((created) => {
+      this.filiais.set(this.sortByName([...this.filiais().filter((item) => item.id !== filial.id), this.mapFilial(created)]));
+    });
     return filial;
   }
 
@@ -92,7 +91,9 @@ export class FiliaisService {
       ),
     );
 
-    this.persist();
+    void lastValueFrom(this.api.put<Filial>(`/filiais/${id}`, payload)).then((updated) => {
+      this.filiais.set(this.sortByName(this.filiais().map((filial) => (filial.id === id ? this.mapFilial(updated) : filial))));
+    });
     return updatedFilial;
   }
 
@@ -117,19 +118,21 @@ export class FiliaisService {
       ),
     );
 
-    this.persist();
+    void lastValueFrom(this.api.patch<Filial>(`/filiais/${id}/status`, { ativa: (updatedFilial as Filial | null)?.ativa })).then((updated) => {
+      this.filiais.set(this.sortByName(this.filiais().map((filial) => (filial.id === id ? this.mapFilial(updated) : filial))));
+    });
     return updatedFilial;
   }
 
   deleteFilial(id: string): void {
     this.filiais.set(this.filiais().filter((filial) => filial.id !== id));
-    this.persist();
+    void lastValueFrom(this.api.delete(`/filiais/${id}`));
   }
 
   private normalizeFiliais(filiais: Filial[]): Filial[] {
     return this.sortByName(
       filiais.map((filial) => ({
-        ...filial,
+        ...mapApiEntity(filial),
         nome: filial.nome ?? 'Filial sem nome',
         descricao: filial.descricao ?? undefined,
         endereco: this.normalizeEndereco(filial.endereco ?? ({} as EnderecoFilial)),
@@ -157,15 +160,20 @@ export class FiliaisService {
     return Array.from(new Set((colaboradoresIds ?? []).filter(Boolean)));
   }
 
-  private persist(): void {
-    this.repository.write(this.filiais());
-  }
-
   private createId(): string {
     return `filial-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
   private sortByName(filiais: Filial[]): Filial[] {
     return [...filiais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
+
+  async reload(): Promise<void> {
+    const filiais = await lastValueFrom(this.api.list<Filial>('/filiais', { limit: 99 }));
+    this.filiais.set(this.normalizeFiliais(mapApiList(filiais)));
+  }
+
+  private mapFilial(filial: Filial): Filial {
+    return this.normalizeFiliais([filial])[0];
   }
 }

@@ -1,6 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Mesa, MesaStatus } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
 
 export interface MesaPayload {
   numero: number;
@@ -12,19 +14,20 @@ export interface MesaPayload {
 
 @Injectable({ providedIn: 'root' })
 export class MesasService {
-  private readonly repository = new LocalStorageRepository<Mesa[]>(
-    'aqui-comanda:mesas',
-    this.createDefaultMesas(),
-  );
+  private readonly api = inject(ApiClientService);
 
-  readonly mesas = signal<Mesa[]>(this.sortMesas(this.normalizeMesas(this.repository.read())));
+  readonly mesas = signal<Mesa[]>([]);
 
   constructor() {
-    this.persist();
+    void this.reload().catch(() => undefined);
   }
 
   getMesas(): Mesa[] {
     return this.mesas();
+  }
+
+  clearData(): void {
+    this.mesas.set([]);
   }
 
   createMesa(payload: MesaPayload): Mesa {
@@ -37,7 +40,9 @@ export class MesasService {
     };
 
     this.mesas.set(this.sortMesas([...this.mesas(), mesa]));
-    this.persist();
+    void lastValueFrom(this.api.post<Mesa>('/mesas', payload)).then((created) => {
+      this.mesas.set(this.sortMesas([...this.mesas().filter((item) => item.id !== mesa.id), this.mapMesa(created)]));
+    });
     return mesa;
   }
 
@@ -55,17 +60,15 @@ export class MesasService {
     });
 
     this.mesas.set(this.sortMesas(mesas));
-    this.persist();
+    void lastValueFrom(this.api.put<Mesa>(`/mesas/${id}`, payload)).then((updated) => {
+      this.mesas.set(this.sortMesas(this.mesas().map((mesa) => (mesa.id === id ? this.mapMesa(updated) : mesa))));
+    });
     return updatedMesa;
   }
 
   deleteMesa(id: string): void {
     this.mesas.set(this.mesas().filter((mesa) => mesa.id !== id));
-    this.persist();
-  }
-
-  private persist(): void {
-    this.repository.write(this.mesas());
+    void lastValueFrom(this.api.delete(`/mesas/${id}`));
   }
 
   private normalizeMesas(mesas: Mesa[]): Mesa[] {
@@ -83,40 +86,18 @@ export class MesasService {
     return `mesa-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  private createDefaultMesas(): Mesa[] {
-    const now = new Date().toISOString();
+  async reload(): Promise<void> {
+    const mesas = await lastValueFrom(this.api.listAll<Mesa>('/mesas'));
+    this.mesas.set(this.sortMesas(this.normalizeMesas(mapApiList(mesas).map((mesa) => this.mapMesa(mesa)))));
+  }
 
-    return [
-      {
-        id: 'mesa-01',
-        numero: 1,
-        nome: 'Mesa 01',
-        status: 'livre',
-        capacidade: 4,
-        observacao: 'Próxima ao balcão.',
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'mesa-02',
-        numero: 2,
-        nome: 'Mesa 02',
-        status: 'livre',
-        capacidade: 4,
-        observacao: 'Atendimento em andamento.',
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'mesa-03',
-        numero: 3,
-        nome: 'Área externa',
-        status: 'reservada',
-        capacidade: 6,
-        observacao: 'Reserva para 20h.',
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
+  private mapMesa(mesa: Mesa): Mesa {
+    return {
+      ...mapApiEntity(mesa),
+      numero: Number(mesa.numero) || 0,
+      status: mesa.status ?? 'livre',
+      createdAt: mesa.createdAt ?? new Date().toISOString(),
+      updatedAt: mesa.updatedAt ?? mesa.createdAt ?? new Date().toISOString(),
+    };
   }
 }

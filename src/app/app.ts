@@ -1,5 +1,6 @@
-import { Component, inject } from '@angular/core';
+import { Component, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { AuthService } from './services/auth.service';
 import { UiSettingsService } from './services/ui-settings.service';
 
 @Component({
@@ -9,5 +10,14 @@ import { UiSettingsService } from './services/ui-settings.service';
   template: '<router-outlet />',
 })
 export class App {
+  private readonly authService = inject(AuthService);
   private readonly uiSettings = inject(UiSettingsService);
+
+  constructor() {
+    effect(() => {
+      if (this.authService.isAuthenticated()) {
+        void this.uiSettings.reload().catch(() => undefined);
+      }
+    });
+  }
 }

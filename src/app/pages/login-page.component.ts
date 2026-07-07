@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { IconComponent, IconName } from '../components/icon.component';
 import { AuthService } from '../services/auth.service';
 import { FiliaisService } from '../services/filiais.service';
+import { formatCpf, isValidCpf, normalizeCpf } from '../utils/cpf';
 
 interface Feature {
   title: string;
@@ -151,18 +152,33 @@ type AuthMode = 'login' | 'register' | 'reset';
                 </div>
               }
 
-              <label for="email">E-mail</label>
+              <label for="email">{{ mode === 'login' ? 'CPF' : 'E-mail' }}</label>
               <div class="input-control">
-                <app-icon name="mail" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="voce@empresa.com"
-                  autocomplete="email"
-                  [disabled]="isSubmitting"
-                  [(ngModel)]="email"
-                />
+                <app-icon [name]="mode === 'login' ? 'users' : 'mail'" />
+                @if (mode === 'login') {
+                  <input
+                    id="email"
+                    name="cpf"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="14"
+                    placeholder="000.000.000-00"
+                    autocomplete="username"
+                    [disabled]="isSubmitting"
+                    [(ngModel)]="cpf"
+                    (ngModelChange)="onCpfChange($event)"
+                  />
+                } @else {
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="voce@empresa.com"
+                    autocomplete="email"
+                    [disabled]="isSubmitting"
+                    [(ngModel)]="email"
+                  />
+                }
               </div>
 
               @if (mode !== 'reset') {
@@ -257,6 +273,7 @@ export class LoginPageComponent {
 
   protected mode: AuthMode = 'login';
   protected name = '';
+  protected cpf = '';
   protected email = '';
   protected password = '';
   protected confirmPassword = '';
@@ -359,7 +376,7 @@ export class LoginPageComponent {
         return;
       }
 
-      await this.authService.loginWithEmail(this.email, this.password);
+      await this.authService.loginWithCpf(normalizeCpf(this.cpf), this.password);
       await this.redirectToHome();
     } catch (error) {
       this.errorMessage = this.authService.getFriendlyErrorMessage(error);
@@ -384,6 +401,27 @@ export class LoginPageComponent {
   }
 
   private validateForm(): boolean {
+    if (this.mode === 'login') {
+      const cpf = normalizeCpf(this.cpf);
+
+      if (!cpf) {
+        this.errorMessage = 'CPF é obrigatório.';
+        return false;
+      }
+
+      if (!isValidCpf(cpf)) {
+        this.errorMessage = 'Informe um CPF válido.';
+        return false;
+      }
+
+      if (!this.password.trim()) {
+        this.errorMessage = 'Informe a senha.';
+        return false;
+      }
+
+      return true;
+    }
+
     const email = this.email.trim();
 
     if (!email) {
@@ -429,7 +467,14 @@ export class LoginPageComponent {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
-  private redirectToHome(): Promise<boolean> {
+  protected onCpfChange(value: string): void {
+    this.cpf = formatCpf(value);
+    this.errorMessage = '';
+    this.successMessage = '';
+  }
+
+  private async redirectToHome(): Promise<boolean> {
+    await this.filiaisService.reload().catch(() => undefined);
     return this.router.navigateByUrl(
       this.filiaisService.hasFilialCadastrada() ? this.authService.getFirstAllowedPath() : '/configuracoes/filiais',
     );

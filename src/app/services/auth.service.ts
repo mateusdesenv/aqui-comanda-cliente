@@ -6,16 +6,28 @@ import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
 import { firebaseAuth } from '../config/firebase';
-import { Colaborador, TelaSistema, telasSistema } from '../models/app-data';
+import { Colaborador, NivelAcesso, PermissaoTela, TelaSistema, telasSistema } from '../models/app-data';
+import { CaixaService } from './caixa.service';
 import { ColaboradoresService } from './colaboradores.service';
-
-const AUTH_PROFILE_MAP_KEY = 'aqui-comanda:firebase-colaboradores';
+import { ComandasService } from './comandas.service';
+import { ClientesService } from './clientes.service';
+import { FiliaisService } from './filiais.service';
+import { ImportExportService } from './import-export.service';
+import { MenuOrderService } from './menu-order.service';
+import { MesasService } from './mesas.service';
+import { PedidosService } from './pedidos.service';
+import { ProdutosService } from './produtos.service';
+import { StockEntriesService } from './stock-entries.service';
+import { UiSettingsService } from './ui-settings.service';
 
 export interface AuthenticatedUser {
   uid: string;
@@ -27,12 +39,24 @@ export interface AuthenticatedUser {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private readonly api = inject(ApiClientService);
   private readonly colaboradoresService = inject(ColaboradoresService);
+  private readonly caixaService = inject(CaixaService);
+  private readonly comandasService = inject(ComandasService);
+  private readonly clientesService = inject(ClientesService);
+  private readonly filiaisService = inject(FiliaisService);
+  private readonly importExportService = inject(ImportExportService);
+  private readonly menuOrderService = inject(MenuOrderService);
+  private readonly mesasService = inject(MesasService);
+  private readonly pedidosService = inject(PedidosService);
+  private readonly produtosService = inject(ProdutosService);
+  private readonly stockEntriesService = inject(StockEntriesService);
+  private readonly uiSettingsService = inject(UiSettingsService);
   private readonly auth = firebaseAuth;
   private readonly provider = new GoogleAuthProvider();
   private readonly currentFirebaseUser = signal<User | null>(this.auth.currentUser);
-  private readonly currentUserId = signal<string | null>(null);
-  private readonly isAuthReady = signal(false);
+  private readonly currentMembership = signal<Colaborador | null>(null);
+  private readonly authReady = signal(false);
   private readonly authReadyPromise: Promise<void>;
 
   readonly user = computed<AuthenticatedUser | null>(() => {
@@ -41,21 +65,41 @@ export class AuthService {
     return user ? this.mapFirebaseUser(user) : null;
   });
 
-  readonly isLoadingAuth = computed(() => !this.isAuthReady());
+  readonly isAuthReady = computed(() => this.authReady());
+  readonly isLoadingAuth = computed(() => !this.authReady());
   readonly isAuthenticated = computed(() => Boolean(this.currentFirebaseUser()));
 
-  readonly currentUser = computed<Colaborador | null>(() => {
-    const id = this.currentUserId();
-    return id ? this.colaboradoresService.getColaboradorById(id) : null;
-  });
+  readonly currentUser = computed<Colaborador | null>(() => this.currentMembership());
 
   constructor() {
     this.authReadyPromise = new Promise((resolve) => {
-      onAuthStateChanged(this.auth, (user) => {
+      let resolved = false;
+      const resolveOnce = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+
+      onAuthStateChanged(this.auth, async (user) => {
+        const previousUid = this.currentFirebaseUser()?.uid;
+        if (!user || previousUid !== user.uid) {
+          this.clearTenantData();
+        }
         this.currentFirebaseUser.set(user);
-        this.currentUserId.set(user ? this.ensureColaboradorForFirebaseUser(user) : null);
-        this.isAuthReady.set(true);
-        resolve();
+
+        try {
+          this.currentMembership.set(user ? await this.loadApiProfile() : null);
+          if (user) {
+            await this.reloadTenantData();
+          }
+        } catch (error) {
+          console.warn('Não foi possível carregar o perfil da API.', error);
+          this.currentMembership.set(null);
+        } finally {
+          this.authReady.set(true);
+          resolveOnce();
+        }
       });
     });
   }
@@ -66,9 +110,13 @@ export class AuthService {
 
   async loginWithEmail(email: string, password: string): Promise<AuthenticatedUser> {
     const credential = await signInWithEmailAndPassword(this.auth, email.trim(), password);
-    this.currentFirebaseUser.set(credential.user);
-    this.currentUserId.set(this.ensureColaboradorForFirebaseUser(credential.user));
-    return this.mapFirebaseUser(credential.user);
+    return this.activateAuthenticatedUser(credential.user);
+  }
+
+  async loginWithCpf(cpf: string, password: string): Promise<AuthenticatedUser> {
+    const response = await lastValueFrom(this.api.post<{ customToken: string }>('/auth/manual-login', { cpf, senha: password }));
+    const credential = await signInWithCustomToken(this.auth, response.customToken);
+    return this.activateAuthenticatedUser(credential.user);
   }
 
   async registerWithEmail(name: string, email: string, password: string): Promise<AuthenticatedUser> {
@@ -78,22 +126,19 @@ export class AuthService {
       await updateProfile(credential.user, { displayName: name.trim() });
     }
 
-    this.currentFirebaseUser.set(this.auth.currentUser ?? credential.user);
-    this.currentUserId.set(this.ensureColaboradorForFirebaseUser(this.auth.currentUser ?? credential.user, name));
-    return this.mapFirebaseUser(this.auth.currentUser ?? credential.user);
+    return this.activateAuthenticatedUser(this.auth.currentUser ?? credential.user);
   }
 
   async loginWithGoogle(): Promise<AuthenticatedUser> {
     const credential = await signInWithPopup(this.auth, this.provider);
-    this.currentFirebaseUser.set(credential.user);
-    this.currentUserId.set(this.ensureColaboradorForFirebaseUser(credential.user));
-    return this.mapFirebaseUser(credential.user);
+    return this.activateAuthenticatedUser(credential.user);
   }
 
   async logout(): Promise<void> {
+    this.clearTenantData();
     await signOut(this.auth);
     this.currentFirebaseUser.set(null);
-    this.currentUserId.set(null);
+    this.currentMembership.set(null);
   }
 
   async resetPassword(email: string): Promise<void> {
@@ -105,9 +150,23 @@ export class AuthService {
   }
 
   onAuthStateChange(callback: (user: AuthenticatedUser | null) => void): () => void {
-    return onAuthStateChanged(this.auth, (user) => {
+    return onAuthStateChanged(this.auth, async (user) => {
+      const previousUid = this.currentFirebaseUser()?.uid;
+      if (!user || previousUid !== user.uid) {
+        this.clearTenantData();
+      }
       this.currentFirebaseUser.set(user);
-      this.currentUserId.set(user ? this.ensureColaboradorForFirebaseUser(user) : null);
+
+      try {
+        this.currentMembership.set(user ? await this.loadApiProfile() : null);
+        if (user) {
+          await this.reloadTenantData();
+        }
+      } catch (error) {
+        console.warn('Não foi possível atualizar o perfil da API.', error);
+        this.currentMembership.set(null);
+      }
+
       callback(user ? this.mapFirebaseUser(user) : null);
     });
   }
@@ -120,24 +179,21 @@ export class AuthService {
     return this.registerWithEmail(name, email, password);
   }
 
-  refreshCurrentUser(): void {
+  async refreshCurrentUser(): Promise<void> {
     const firebaseUser = this.currentFirebaseUser();
 
     if (!firebaseUser) {
-      this.currentUserId.set(null);
+      this.currentMembership.set(null);
       return;
     }
 
-    const colaboradorId = this.ensureColaboradorForFirebaseUser(firebaseUser);
-    const currentUser = this.colaboradoresService.getColaboradorById(colaboradorId);
-
-    if (!currentUser || !currentUser.ativo) {
-      this.currentUserId.set(null);
-      void this.logout();
-      return;
+    try {
+      this.currentMembership.set(await this.loadApiProfile());
+      await this.reloadTenantData();
+    } catch (error) {
+      console.warn('Não foi possível recarregar o perfil da API.', error);
+      this.currentMembership.set(null);
     }
-
-    this.currentUserId.set(colaboradorId);
   }
 
   canRead(tela: TelaSistema): boolean {
@@ -182,6 +238,11 @@ export class AuthService {
   }
 
   getFriendlyErrorMessage(error: unknown): string {
+    if (typeof error === 'object' && error !== null && 'error' in error) {
+      const apiMessage = (error as { error?: { message?: string } }).error?.message;
+      if (apiMessage) return apiMessage;
+    }
+
     const code = this.isAuthError(error) ? error.code : '';
 
     const messages: Record<string, string> = {
@@ -203,36 +264,6 @@ export class AuthService {
     return messages[code] ?? 'Erro ao autenticar. Tente novamente.';
   }
 
-  private ensureColaboradorForFirebaseUser(user: User, fallbackName?: string): string {
-    const storedMap = this.readProfileMap();
-    const storedId = storedMap[user.uid];
-
-    if (storedId && this.colaboradoresService.getColaboradorById(storedId)) {
-      return storedId;
-    }
-
-    const email = user.email?.trim().toLowerCase();
-    const existingColaborador = this.colaboradoresService
-      .getColaboradores()
-      .find((colaborador) => colaborador.usuario.trim().toLowerCase() === email);
-
-    if (existingColaborador) {
-      this.writeProfileMap({ ...storedMap, [user.uid]: existingColaborador.id });
-      return existingColaborador.id;
-    }
-
-    const colaborador = this.colaboradoresService.createColaborador({
-      nome: fallbackName?.trim() || user.displayName || email || 'Usuário Firebase',
-      usuario: email || user.uid,
-      nivel: 'admin',
-      ativo: true,
-      permissoes: this.colaboradoresService.createFullPermissoes(),
-    });
-
-    this.writeProfileMap({ ...storedMap, [user.uid]: colaborador.id });
-    return colaborador.id;
-  }
-
   private mapFirebaseUser(user: User): AuthenticatedUser {
     return {
       uid: user.uid,
@@ -247,24 +278,84 @@ export class AuthService {
     return typeof error === 'object' && error !== null && 'code' in error;
   }
 
-  private readProfileMap(): Record<string, string> {
-    if (typeof localStorage === 'undefined') {
-      return {};
-    }
-
-    try {
-      return JSON.parse(localStorage.getItem(AUTH_PROFILE_MAP_KEY) ?? '{}') as Record<string, string>;
-    } catch {
-      localStorage.removeItem(AUTH_PROFILE_MAP_KEY);
-      return {};
-    }
+  private async activateAuthenticatedUser(user: User): Promise<AuthenticatedUser> {
+    this.clearTenantData();
+    const activeUser = await this.waitForFirebaseCurrentUser(user.uid);
+    await activeUser.getIdToken(true);
+    this.currentFirebaseUser.set(activeUser);
+    this.currentMembership.set(await this.loadApiProfile());
+    await this.reloadTenantData();
+    return this.mapFirebaseUser(activeUser);
   }
 
-  private writeProfileMap(profileMap: Record<string, string>): void {
-    if (typeof localStorage === 'undefined') {
-      return;
+  private async waitForFirebaseCurrentUser(uid: string): Promise<User> {
+    if (this.auth.currentUser?.uid === uid) {
+      return this.auth.currentUser;
     }
 
-    localStorage.setItem(AUTH_PROFILE_MAP_KEY, JSON.stringify(profileMap));
+    return new Promise<User>((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        unsubscribe();
+        reject(new Error('Não foi possível confirmar a sessão Firebase atual.'));
+      }, 5000);
+
+      const unsubscribe = onAuthStateChanged(this.auth, (currentUser) => {
+        if (currentUser?.uid === uid) {
+          window.clearTimeout(timeout);
+          unsubscribe();
+          resolve(currentUser);
+        }
+      });
+    });
+  }
+
+  private clearTenantData(): void {
+    this.caixaService.clearData();
+    this.comandasService.clearData();
+    this.clientesService.clearData();
+    this.colaboradoresService.clearData();
+    this.filiaisService.clearData();
+    this.importExportService.clearData();
+    this.menuOrderService.clearData();
+    this.mesasService.clearData();
+    this.pedidosService.clearData();
+    this.produtosService.clearData();
+    this.stockEntriesService.clearData();
+    this.uiSettingsService.clearData();
+  }
+
+  private async reloadTenantData(): Promise<void> {
+    await this.filiaisService.reload();
+
+    await Promise.all([
+      this.caixaService.reload().catch(() => undefined),
+      this.comandasService.reload().catch(() => undefined),
+      this.clientesService.reload().catch(() => undefined),
+      this.colaboradoresService.reload().catch(() => undefined),
+      this.menuOrderService.reload().catch(() => undefined),
+      this.mesasService.reload().catch(() => undefined),
+      this.pedidosService.reload().catch(() => undefined),
+      this.produtosService.reload().catch(() => undefined),
+      this.stockEntriesService.reload().catch(() => undefined),
+      this.uiSettingsService.reload().catch(() => undefined),
+    ]);
+  }
+
+  private async loadApiProfile(): Promise<Colaborador | null> {
+    const profile = await lastValueFrom(this.api.get<Record<string, any>>('/auth/me'));
+    const nivel = (profile['role'] ?? profile['nivel'] ?? 'colaborador') as NivelAcesso;
+    const permissoes = (profile['permissoes'] ?? []) as PermissaoTela[];
+
+    return {
+      id: String(profile['membershipId'] ?? profile['id'] ?? profile['uid']),
+      nome: String(profile['name'] ?? profile['nome'] ?? profile['email'] ?? 'Usuário'),
+      usuario: String(profile['email'] ?? profile['usuario'] ?? profile['uid']),
+      senha: '',
+      nivel,
+      ativo: true,
+      permissoes: this.colaboradoresService.normalizePermissoes(permissoes, nivel),
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+    };
   }
 }

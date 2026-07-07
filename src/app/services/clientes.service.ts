@@ -1,6 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
+import { ApiClientService } from '../core/api/api-client.service';
+import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Cliente } from '../models/app-data';
-import { LocalStorageRepository } from './local-storage.repository';
 
 export interface ClientePayload {
   nome: string;
@@ -12,19 +14,20 @@ export interface ClientePayload {
 
 @Injectable({ providedIn: 'root' })
 export class ClientesService {
-  private readonly repository = new LocalStorageRepository<Cliente[]>(
-    'aqui-comanda:clientes',
-    [],
-  );
+  private readonly api = inject(ApiClientService);
 
-  readonly clientes = signal<Cliente[]>(this.sortByName(this.repository.read()));
+  readonly clientes = signal<Cliente[]>([]);
 
   constructor() {
-    this.persist();
+    void this.reload().catch(() => undefined);
   }
 
   getClientes(): Cliente[] {
     return this.clientes();
+  }
+
+  clearData(): void {
+    this.clientes.set([]);
   }
 
   createCliente(payload: ClientePayload): Cliente {
@@ -37,7 +40,9 @@ export class ClientesService {
     };
 
     this.clientes.set(this.sortByName([...this.clientes(), cliente]));
-    this.persist();
+    void lastValueFrom(this.api.post<Cliente>('/clientes', payload)).then((created) => {
+      this.clientes.set(this.sortByName([...this.clientes().filter((item) => item.id !== cliente.id), this.mapCliente(created)]));
+    });
     return cliente;
   }
 
@@ -55,17 +60,20 @@ export class ClientesService {
     });
 
     this.clientes.set(this.sortByName(clientes));
-    this.persist();
+    void lastValueFrom(this.api.put<Cliente>(`/clientes/${id}`, payload)).then((updated) => {
+      this.clientes.set(this.sortByName(this.clientes().map((cliente) => (cliente.id === id ? this.mapCliente(updated) : cliente))));
+    });
     return updatedCliente;
   }
 
   deleteCliente(id: string): void {
     this.clientes.set(this.clientes().filter((cliente) => cliente.id !== id));
-    this.persist();
+    void lastValueFrom(this.api.delete(`/clientes/${id}`));
   }
 
-  private persist(): void {
-    this.repository.write(this.clientes());
+  async reload(): Promise<void> {
+    const clientes = await lastValueFrom(this.api.listAll<Cliente>('/clientes'));
+    this.clientes.set(this.sortByName(mapApiList(clientes).map((cliente) => this.mapCliente(cliente))));
   }
 
   private sortByName(clientes: Cliente[]): Cliente[] {
@@ -74,5 +82,15 @@ export class ClientesService {
 
   private createId(): string {
     return `cliente-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  private mapCliente(cliente: Cliente): Cliente {
+    return {
+      ...mapApiEntity(cliente),
+      cpf: cliente.cpf ?? (cliente as Cliente & { documento?: string }).documento ?? '',
+      dataNascimento: cliente.dataNascimento ?? '',
+      createdAt: cliente.createdAt ?? new Date().toISOString(),
+      updatedAt: cliente.updatedAt ?? cliente.createdAt ?? new Date().toISOString(),
+    };
   }
 }
