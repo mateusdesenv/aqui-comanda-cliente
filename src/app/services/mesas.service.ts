@@ -87,7 +87,7 @@ export class MesasService {
   }
 
   async reload(): Promise<void> {
-    const mesas = await lastValueFrom(this.api.list<Mesa>('/mesas', { limit: 500 }));
+    const mesas = await lastValueFrom(this.api.listAll<Mesa>('/mesas'));
     this.mesas.set(this.sortMesas(this.normalizeMesas(mapApiList(mesas).map((mesa) => this.mapMesa(mesa)))));
   }
 

@@ -322,7 +322,7 @@ export class ProdutosService {
   }
 
   async reload(): Promise<void> {
-    const produtos = await lastValueFrom(this.api.list<Produto>('/produtos', { limit: 1000 }));
+    const produtos = await lastValueFrom(this.api.listAll<Produto>('/produtos'));
     this.produtos.set(this.sortByName(this.normalizeProdutos(mapApiList(produtos))));
   }
 

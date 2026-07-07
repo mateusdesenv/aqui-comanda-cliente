@@ -72,7 +72,7 @@ export class ClientesService {
   }
 
   async reload(): Promise<void> {
-    const clientes = await lastValueFrom(this.api.list<Cliente>('/clientes', { limit: 500 }));
+    const clientes = await lastValueFrom(this.api.listAll<Cliente>('/clientes'));
     this.clientes.set(this.sortByName(mapApiList(clientes).map((cliente) => this.mapCliente(cliente))));
   }
 

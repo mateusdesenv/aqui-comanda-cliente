@@ -441,7 +441,7 @@ export class ComandasService {
   }
 
   async reload(): Promise<void> {
-    const comandas = await lastValueFrom(this.api.list<Comanda>('/comandas', { limit: 1000 }));
+    const comandas = await lastValueFrom(this.api.listAll<Comanda>('/comandas'));
     this.comandas.set(this.normalizeComandas(mapApiList(comandas)));
   }
 

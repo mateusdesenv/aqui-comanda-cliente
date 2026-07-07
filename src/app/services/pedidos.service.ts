@@ -241,7 +241,7 @@ export class PedidosService {
   }
 
   async reload(): Promise<void> {
-    const pedidos = await lastValueFrom(this.api.list<Pedido>('/pedidos', { limit: 1000 }));
+    const pedidos = await lastValueFrom(this.api.listAll<Pedido>('/pedidos'));
     this.pedidos.set(this.sortByCreatedAt(this.normalizePedidos(mapApiList(pedidos))));
   }
 

@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiListData, ApiQueryParams, ApiResponse } from './api-response.types';
 
@@ -18,6 +18,32 @@ export class ApiClientService {
   list<T>(path: string, params?: ApiQueryParams): Observable<T[]> {
     return this.get<ApiListData<T> | T[]>(path, params).pipe(
       map((data) => (Array.isArray(data) ? data : data.items)),
+    );
+  }
+
+  listAll<T>(path: string, params?: ApiQueryParams): Observable<T[]> {
+    const pageSize = 100;
+    const firstPageParams = { ...params, page: 1, limit: pageSize };
+
+    return this.get<ApiListData<T> | T[]>(path, firstPageParams).pipe(
+      switchMap((data) => {
+        if (Array.isArray(data)) {
+          return of(data);
+        }
+
+        const items = [...data.items];
+        const totalPages = data.pagination?.totalPages ?? 1;
+
+        if (totalPages <= 1) {
+          return of(items);
+        }
+
+        const pageRequests = Array.from({ length: totalPages - 1 }, (_item, index) =>
+          this.list<T>(path, { ...params, page: index + 2, limit: pageSize }),
+        );
+
+        return forkJoin(pageRequests).pipe(map((pages) => items.concat(...pages)));
+      }),
     );
   }
 

@@ -265,8 +265,8 @@ export class CaixaService {
 
   async reload(): Promise<void> {
     const [sessoes, entradas] = await Promise.all([
-      lastValueFrom(this.api.list<SessaoCaixa>('/caixa/sessoes', { limit: 500 })),
-      lastValueFrom(this.api.list<EntradaCaixa>('/caixa/entradas', { limit: 1000 })),
+      lastValueFrom(this.api.listAll<SessaoCaixa>('/caixa/sessoes')),
+      lastValueFrom(this.api.listAll<EntradaCaixa>('/caixa/entradas')),
     ]);
     this.entradas.set(this.normalizeEntradas(mapApiList(entradas)));
     this.sessoes.set(this.normalizeSessoes(mapApiList(sessoes)));

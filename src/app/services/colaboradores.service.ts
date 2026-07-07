@@ -195,7 +195,7 @@ export class ColaboradoresService {
   }
 
   async reload(): Promise<void> {
-    const colaboradores = await lastValueFrom(this.api.list<Colaborador>('/colaboradores', { limit: 500 }));
+    const colaboradores = await lastValueFrom(this.api.listAll<Colaborador>('/colaboradores'));
     this.colaboradores.set(this.normalizeColaboradores(mapApiList(colaboradores)));
   }
 

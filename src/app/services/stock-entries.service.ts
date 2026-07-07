@@ -156,7 +156,7 @@ export class StockEntriesService {
   }
 
   async reload(): Promise<void> {
-    const entries = await lastValueFrom(this.api.list<StockEntry>('/estoque/entradas', { limit: 1000 }));
+    const entries = await lastValueFrom(this.api.listAll<StockEntry>('/estoque/entradas'));
     this.stockEntries.set(this.sortEntries(this.normalizeEntries(mapApiList(entries))));
   }
 
