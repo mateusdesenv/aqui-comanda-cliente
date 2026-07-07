@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Cliente } from '../models/app-data';
 
@@ -13,20 +14,18 @@ export interface ClientePayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ClientesService {
+export class ClientesService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
 
   readonly clientes = signal<Cliente[]>([]);
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getClientes(): Cliente[] {
     return this.clientes();
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.clientes.set([]);
   }
 
@@ -42,7 +41,7 @@ export class ClientesService {
     this.clientes.set(this.sortByName([...this.clientes(), cliente]));
     void lastValueFrom(this.api.post<Cliente>('/clientes', payload)).then((created) => {
       this.clientes.set(this.sortByName([...this.clientes().filter((item) => item.id !== cliente.id), this.mapCliente(created)]));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return cliente;
   }
 
@@ -62,16 +61,16 @@ export class ClientesService {
     this.clientes.set(this.sortByName(clientes));
     void lastValueFrom(this.api.put<Cliente>(`/clientes/${id}`, payload)).then((updated) => {
       this.clientes.set(this.sortByName(this.clientes().map((cliente) => (cliente.id === id ? this.mapCliente(updated) : cliente))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedCliente;
   }
 
   deleteCliente(id: string): void {
     this.clientes.set(this.clientes().filter((cliente) => cliente.id !== id));
-    void lastValueFrom(this.api.delete(`/clientes/${id}`));
+    void lastValueFrom(this.api.delete(`/clientes/${id}`)).catch(() => this.reload().catch(() => undefined));
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const clientes = await lastValueFrom(this.api.listAll<Cliente>('/clientes'));
     this.clientes.set(this.sortByName(mapApiList(clientes).map((cliente) => this.mapCliente(cliente))));
   }

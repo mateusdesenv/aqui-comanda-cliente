@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { ItemPedido, Pedido, PedidoPaymentMethod, PedidoStatus } from '../models/app-data';
 
@@ -25,7 +26,7 @@ export interface PedidoPayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class PedidosService {
+export class PedidosService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
   private readonly workflowStatusSequence: PedidoStatus[] = ['aberto', 'em_preparo', 'saiu_entrega', 'entregue'];
 
@@ -34,15 +35,13 @@ export class PedidosService {
     this.pedidos().filter((pedido) => !['entregue', 'cancelado'].includes(pedido.status)),
   );
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getPedidos(): Pedido[] {
     return this.pedidos();
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.pedidos.set([]);
   }
 
@@ -81,7 +80,7 @@ export class PedidosService {
     this.pedidos.set(this.sortByCreatedAt([pedido, ...this.pedidos()]));
     void lastValueFrom(this.api.post<Pedido>('/pedidos', payload)).then((created) => {
       this.pedidos.set(this.sortByCreatedAt([this.mapPedido(created), ...this.pedidos().filter((item) => item.id !== pedido.id)]));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return pedido;
   }
 
@@ -130,7 +129,7 @@ export class PedidosService {
     );
     void lastValueFrom(this.api.put<Pedido>(`/pedidos/${id}`, payload)).then((updated) => {
       this.pedidos.set(this.sortByCreatedAt(this.pedidos().map((pedido) => (pedido.id === id ? this.mapPedido(updated) : pedido))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedPedido;
   }
 
@@ -155,7 +154,7 @@ export class PedidosService {
     );
     void lastValueFrom(this.api.post<Pedido>(`/pedidos/${id}/confirmar-pagamento`, {})).then((updated) => {
       this.pedidos.set(this.sortByCreatedAt(this.pedidos().map((pedido) => (pedido.id === id ? this.mapPedido(updated) : pedido))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedPedido;
   }
 
@@ -185,13 +184,13 @@ export class PedidosService {
     );
     void lastValueFrom(this.api.patch<Pedido>(`/pedidos/${id}/status`, { status })).then((updated) => {
       this.pedidos.set(this.sortByCreatedAt(this.pedidos().map((pedido) => (pedido.id === id ? this.mapPedido(updated) : pedido))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedPedido;
   }
 
   deletePedido(id: string): void {
     this.pedidos.set(this.pedidos().filter((pedido) => pedido.id !== id));
-    void lastValueFrom(this.api.delete(`/pedidos/${id}`));
+    void lastValueFrom(this.api.delete(`/pedidos/${id}`)).catch(() => this.reload().catch(() => undefined));
   }
 
   private normalizePedidos(pedidos: Pedido[]): Pedido[] {
@@ -240,7 +239,7 @@ export class PedidosService {
     return `PED-${String(nextNumber).padStart(4, '0')}`;
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const pedidos = await lastValueFrom(this.api.listAll<Pedido>('/pedidos'));
     this.pedidos.set(this.sortByCreatedAt(this.normalizePedidos(mapApiList(pedidos))));
   }

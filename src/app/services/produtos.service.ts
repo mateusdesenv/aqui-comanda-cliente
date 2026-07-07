@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
+import { ApiBackedState } from '../core/api/api-backed-state';
 import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import {
   ProductCategory,
@@ -21,7 +22,7 @@ export interface ProdutoPayload {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ProdutosService {
+export class ProdutosService extends ApiBackedState {
   readonly categories = productCategories;
   readonly tamanhos = produtoTamanhos;
 
@@ -30,15 +31,13 @@ export class ProdutosService {
   readonly produtos = signal<Produto[]>([]);
   readonly produtosAtivos = computed(() => this.produtos().filter((produto) => produto.ativo));
 
-  constructor() {
-    void this.reload().catch(() => undefined);
-  }
 
   getProdutos(): Produto[] {
     return this.produtos();
   }
 
   clearData(): void {
+    super.clearLoadState();
     this.produtos.set([]);
   }
 
@@ -110,7 +109,7 @@ export class ProdutosService {
     this.produtos.set(this.sortByName([...this.produtos(), produto]));
     void lastValueFrom(this.api.post<Produto>('/produtos', payload)).then((created) => {
       this.produtos.set(this.sortByName([...this.produtos().filter((item) => item.id !== produto.id), this.mapProduto(created)]));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return produto;
   }
 
@@ -130,13 +129,13 @@ export class ProdutosService {
     this.produtos.set(this.sortByName(produtos));
     void lastValueFrom(this.api.put<Produto>(`/produtos/${id}`, payload)).then((updated) => {
       this.produtos.set(this.sortByName(this.produtos().map((produto) => (produto.id === id ? this.mapProduto(updated) : produto))));
-    });
+    }).catch(() => this.reload().catch(() => undefined));
     return updatedProduto;
   }
 
   deleteProduto(id: string): void {
     this.produtos.set(this.produtos().filter((produto) => produto.id !== id));
-    void lastValueFrom(this.api.delete(`/produtos/${id}`));
+    void lastValueFrom(this.api.delete(`/produtos/${id}`)).catch(() => this.reload().catch(() => undefined));
   }
 
   hasProduto(id: string): boolean {
@@ -321,7 +320,7 @@ export class ProdutosService {
     return aliases[normalized] ?? 'medio';
   }
 
-  async reload(): Promise<void> {
+  protected override async loadFromApi(): Promise<void> {
     const produtos = await lastValueFrom(this.api.listAll<Produto>('/produtos'));
     this.produtos.set(this.sortByName(this.normalizeProdutos(mapApiList(produtos))));
   }

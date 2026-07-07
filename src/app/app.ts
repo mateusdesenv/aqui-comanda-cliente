@@ -16,7 +16,7 @@ export class App {
   constructor() {
     effect(() => {
       if (this.authService.isAuthenticated()) {
-        void this.uiSettings.reload().catch(() => undefined);
+        void this.uiSettings.ensureLoaded().catch(() => undefined);
       }
     });
   }
