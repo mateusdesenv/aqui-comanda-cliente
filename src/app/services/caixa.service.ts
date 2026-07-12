@@ -35,57 +35,27 @@ export class CaixaService extends ApiBackedState {
     return Boolean(this.getSessaoAberta());
   }
 
-  abrirCaixa(observacaoAbertura = '', usuario?: Colaborador | null): SessaoCaixa | null {
+  async abrirCaixa(observacaoAbertura = '', usuario?: Colaborador | null): Promise<SessaoCaixa | null> {
     if (this.hasCaixaAberto()) {
       return null;
     }
 
-    const now = new Date().toISOString();
-    const sessao: SessaoCaixa = {
-      id: `caixa-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      status: 'aberto',
-      abertoEm: now,
-      abertoPorId: usuario?.id,
-      abertoPorNome: usuario?.nome,
-      observacaoAbertura: observacaoAbertura.trim() || undefined,
-      totalEntradas: 0,
-      quantidadeEntradas: 0,
-    };
-
-    this.sessoes.set([sessao, ...this.sessoes()]);
-    void lastValueFrom(this.api.post<SessaoCaixa>('/caixa/sessoes/abrir', { observacaoAbertura }))
-      .then(async () => this.reload())
-      .catch(() => this.reload().catch(() => undefined));
+    const sessao = mapApiEntity(await lastValueFrom(this.api.post<SessaoCaixa>('/caixa/sessoes/abrir', { observacaoAbertura })));
+    this.sessoes.set(this.normalizeSessoes([sessao, ...this.sessoes()]));
+    await this.reload();
     return sessao;
   }
 
-  fecharCaixa(observacaoFechamento = '', usuario?: Colaborador | null): SessaoCaixa | null {
+  async fecharCaixa(observacaoFechamento = '', usuario?: Colaborador | null): Promise<SessaoCaixa | null> {
     const sessaoAberta = this.getSessaoAberta();
 
     if (!sessaoAberta) {
       return null;
     }
 
-    const now = new Date().toISOString();
-    const entradasDaSessao = this.getEntradasBySessao(sessaoAberta.id);
-    const totalEntradas = this.getTotalRecebido(entradasDaSessao);
-    const sessaoFechada: SessaoCaixa = {
-      ...sessaoAberta,
-      status: 'fechado',
-      fechadoEm: now,
-      fechadoPorId: usuario?.id,
-      fechadoPorNome: usuario?.nome,
-      observacaoFechamento: observacaoFechamento.trim() || undefined,
-      totalEntradas,
-      quantidadeEntradas: entradasDaSessao.length,
-    };
-
-    this.sessoes.set(
-      this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? sessaoFechada : sessao)),
-    );
-    void lastValueFrom(this.api.post<SessaoCaixa>(`/caixa/sessoes/${sessaoAberta.id}/fechar`, { observacaoFechamento }))
-      .then(async () => this.reload())
-      .catch(() => this.reload().catch(() => undefined));
+    const sessaoFechada = mapApiEntity(await lastValueFrom(this.api.post<SessaoCaixa>(`/caixa/sessoes/${sessaoAberta.id}/fechar`, { observacaoFechamento })));
+    this.sessoes.set(this.normalizeSessoes(this.sessoes().map((sessao) => (sessao.id === sessaoAberta.id ? sessaoFechada : sessao))));
+    await this.reload();
     return sessaoFechada;
   }
 

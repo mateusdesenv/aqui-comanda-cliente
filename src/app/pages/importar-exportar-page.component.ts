@@ -588,7 +588,7 @@ export class ImportarExportarPageComponent {
 
   private reloadAfterImport(module?: ImportExportModule): void {
     if (!module || module.id === 'filiais') {
-      this.filiaisService.reloadFromStorage();
+      this.filiaisService.reloadFromApi();
     }
   }
 
