@@ -20,7 +20,7 @@ export class FiliaisService extends ApiBackedState {
   readonly filiais = signal<Filial[]>([]);
 
 
-  reloadFromStorage(): void {
+  reloadFromApi(): void {
     void this.reload().catch(() => undefined);
   }
 

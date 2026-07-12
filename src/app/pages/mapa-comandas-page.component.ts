@@ -291,7 +291,7 @@ export class MapaComandasPageComponent {
     this.quickFinishCandidate = null;
   }
 
-  protected confirmQuickFinishComanda(): void {
+  protected async confirmQuickFinishComanda(): Promise<void> {
     if (!this.quickFinishCandidate || !this.ensureCanWrite()) {
       return;
     }
@@ -303,8 +303,17 @@ export class MapaComandasPageComponent {
     }
 
     const clienteNome = this.quickFinishCandidate.clienteNome ?? 'cliente';
-    const finalized = this.comandasService.finalizeComandaById(this.quickFinishCandidate.id);
+    const candidateId = this.quickFinishCandidate.id;
     this.quickFinishCandidate = null;
+
+    let finalized: Comanda | null = null;
+    try {
+      finalized = await this.comandasService.finalizeComandaById(candidateId);
+    } catch (error) {
+      this.feedbackMessage =
+        error instanceof Error ? error.message : 'Não foi possível registrar a comanda no caixa.';
+      return;
+    }
 
     if (!finalized) {
       this.feedbackMessage = 'Não foi possível finalizar a comanda rápida. Verifique se ela ainda está aberta e possui itens.';

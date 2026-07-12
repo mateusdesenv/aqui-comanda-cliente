@@ -893,7 +893,7 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.finishCandidate = null;
   }
 
-  protected confirmFinishComanda(): void {
+  protected async confirmFinishComanda(): Promise<void> {
     if (!this.finishCandidate || !this.canWrite) {
       return;
     }
@@ -904,8 +904,21 @@ export class ComandaDetailModalComponent implements OnChanges {
       return;
     }
 
-    const finalized = this.comandasService.finalizeComandaById(this.finishCandidate.id);
+    const candidateId = this.finishCandidate.id;
     this.finishCandidate = null;
+
+    let finalized: Comanda | null = null;
+    try {
+      await this.comandasService.saveItemsForComanda(candidateId, this.items);
+      finalized = await this.comandasService.finalizeComandaById(candidateId);
+    } catch (error) {
+      this.showModalFeedback(
+        error instanceof Error ? error.message : 'Não foi possível registrar a comanda no caixa.',
+        'error',
+      );
+      this.syncSelectedComandaItems();
+      return;
+    }
 
     if (!finalized) {
       this.showModalFeedback(
@@ -936,13 +949,23 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.releaseMesaConfirmationOpen = false;
   }
 
-  protected confirmReleaseMesa(): void {
+  protected async confirmReleaseMesa(): Promise<void> {
     if (!this.canWrite || !this.canReleaseMesa) {
       return;
     }
 
-    const released = this.comandasService.releaseMesa(this.mesa.id);
     this.releaseMesaConfirmationOpen = false;
+
+    let released = false;
+    try {
+      released = await this.comandasService.releaseMesa(this.mesa.id);
+    } catch (error) {
+      this.showModalFeedback(
+        error instanceof Error ? error.message : 'Não foi possível liberar a mesa no backend.',
+        'error',
+      );
+      return;
+    }
 
     if (!released) {
       this.showModalFeedback(
@@ -996,17 +1019,17 @@ export class ComandaDetailModalComponent implements OnChanges {
     this.selectedComandaId = firstOpenComanda?.id ?? '';
   }
 
-  private persistItems(): void {
+  private async persistItems(): Promise<void> {
     if (!this.selectedComandaId || !this.canEditSelectedComanda) {
       return;
     }
 
     const currentId = this.selectedComandaId;
     try {
-      this.comandasService.saveItemsForComanda(currentId, this.items);
+      await this.comandasService.saveItemsForComanda(currentId, this.items);
     } catch (error) {
       this.showModalFeedback(
-        error instanceof Error ? error.message : 'Produto sem estoque disponível.',
+        error instanceof Error ? error.message : 'Não foi possível salvar os itens no banco.',
         'error',
       );
       this.syncSelectedComandaItems();

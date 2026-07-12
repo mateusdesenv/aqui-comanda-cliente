@@ -417,14 +417,21 @@ export class CaixaPageComponent {
     this.fecharCaixaModalOpen = false;
   }
 
-  protected confirmAbrirCaixa(): void {
+  protected async confirmAbrirCaixa(): Promise<void> {
     if (!this.canWriteCaixa) {
       this.errorMessage = 'Você não tem permissão para abrir o caixa.';
       return;
     }
 
-    const sessao = this.caixaService.abrirCaixa(this.observacaoAbertura, this.authService.currentUser());
     this.closeCaixaModals();
+
+    let sessao = null;
+    try {
+      sessao = await this.caixaService.abrirCaixa(this.observacaoAbertura, this.authService.currentUser());
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : 'Não foi possível abrir o caixa no backend.';
+      return;
+    }
 
     if (!sessao) {
       this.errorMessage = 'Já existe um caixa aberto.';
@@ -434,14 +441,21 @@ export class CaixaPageComponent {
     this.feedbackMessage = 'Caixa aberto com sucesso.';
   }
 
-  protected confirmFecharCaixa(): void {
+  protected async confirmFecharCaixa(): Promise<void> {
     if (!this.canWriteCaixa) {
       this.errorMessage = 'Você não tem permissão para fechar o caixa.';
       return;
     }
 
-    const sessao = this.caixaService.fecharCaixa(this.observacaoFechamento, this.authService.currentUser());
     this.closeCaixaModals();
+
+    let sessao = null;
+    try {
+      sessao = await this.caixaService.fecharCaixa(this.observacaoFechamento, this.authService.currentUser());
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : 'Não foi possível fechar o caixa no backend.';
+      return;
+    }
 
     if (!sessao) {
       this.errorMessage = 'Não existe caixa aberto para fechar.';
