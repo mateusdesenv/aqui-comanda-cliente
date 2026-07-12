@@ -49,42 +49,14 @@ export class PedidosService extends ApiBackedState {
     return this.pedidosAtivos();
   }
 
-  createPedido(payload: PedidoPayload): Pedido {
-    const now = new Date().toISOString();
-    const itens = this.normalizeItems(payload.itens);
-    const pedido: Pedido = {
-      id: this.createId(),
-      codigo: this.createCodigo(),
-      clienteId: payload.clienteId || undefined,
-      clienteNome: payload.clienteNome,
-      telefone: payload.telefone || undefined,
-      cepEntrega: payload.cepEntrega || undefined,
-      enderecoEntrega: payload.enderecoEntrega,
-      numero: payload.numero || undefined,
-      complemento: payload.complemento || undefined,
-      bairro: payload.bairro || undefined,
-      cidade: payload.cidade || undefined,
-      estado: payload.estado || undefined,
-      observacoesEntrega: payload.observacoesEntrega || undefined,
-      itens,
-      total: this.getItemsTotal(itens),
-      formaPagamento: payload.formaPagamento || undefined,
-      trocoPara: payload.trocoPara || undefined,
-      observacoesPedido: payload.observacoesPedido || undefined,
-      pagamentoConfirmado: false,
-      status: 'aberto',
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.pedidos.set(this.sortByCreatedAt([pedido, ...this.pedidos()]));
-    void lastValueFrom(this.api.post<Pedido>('/pedidos', payload)).then((created) => {
-      this.pedidos.set(this.sortByCreatedAt([this.mapPedido(created), ...this.pedidos().filter((item) => item.id !== pedido.id)]));
-    }).catch(() => this.reload().catch(() => undefined));
+  async createPedido(payload: PedidoPayload): Promise<Pedido> {
+    const created = await lastValueFrom(this.api.post<Pedido>('/pedidos', payload));
+    const pedido = this.mapPedido(created);
+    await this.reload();
     return pedido;
   }
 
-  updatePedido(id: string, payload: PedidoPayload): Pedido | null {
+  async updatePedido(id: string, payload: PedidoPayload): Promise<Pedido | null> {
     const existingPedido = this.pedidos().find((pedido) => pedido.id === id);
 
     if (!existingPedido) {
@@ -98,39 +70,10 @@ export class PedidosService extends ApiBackedState {
       return null;
     }
 
-    const itens = this.normalizeItems(payload.itens);
-    const updatedPedido: Pedido = {
-      ...existingPedido,
-      clienteId: payload.clienteId || undefined,
-      clienteNome: payload.clienteNome,
-      telefone: payload.telefone || undefined,
-      cepEntrega: payload.cepEntrega || undefined,
-      enderecoEntrega: payload.enderecoEntrega,
-      numero: payload.numero || undefined,
-      complemento: payload.complemento || undefined,
-      bairro: payload.bairro || undefined,
-      cidade: payload.cidade || undefined,
-      estado: payload.estado || undefined,
-      observacoesEntrega: payload.observacoesEntrega || undefined,
-      itens,
-      total: this.getItemsTotal(itens),
-      formaPagamento: payload.formaPagamento || undefined,
-      trocoPara: payload.trocoPara || undefined,
-      observacoesPedido: payload.observacoesPedido || undefined,
-      status: nextStatus,
-      justificativaCancelamento: nextStatus === 'cancelado' ? justificativaCancelamento : undefined,
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.pedidos.set(
-      this.sortByCreatedAt(
-        this.pedidos().map((pedido) => (pedido.id === id ? updatedPedido : pedido)),
-      ),
-    );
-    void lastValueFrom(this.api.put<Pedido>(`/pedidos/${id}`, payload)).then((updated) => {
-      this.pedidos.set(this.sortByCreatedAt(this.pedidos().map((pedido) => (pedido.id === id ? this.mapPedido(updated) : pedido))));
-    }).catch(() => this.reload().catch(() => undefined));
-    return updatedPedido;
+    const updated = await lastValueFrom(this.api.put<Pedido>(`/pedidos/${id}`, payload));
+    const pedido = this.mapPedido(updated);
+    await this.reload();
+    return pedido;
   }
 
   confirmPayment(id: string): Pedido | null {
@@ -228,15 +171,6 @@ export class PedidosService extends ApiBackedState {
 
   private sortByCreatedAt(pedidos: Pedido[]): Pedido[] {
     return [...pedidos].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-
-  private createId(): string {
-    return `pedido-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
-
-  private createCodigo(): string {
-    const nextNumber = this.pedidos().length + 1;
-    return `PED-${String(nextNumber).padStart(4, '0')}`;
   }
 
   protected override async loadFromApi(): Promise<void> {
