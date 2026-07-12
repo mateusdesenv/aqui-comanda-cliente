@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { ApiClientService } from '../core/api/api-client.service';
 import { ApiBackedState } from '../core/api/api-backed-state';
-import { mapApiEntity, mapApiList } from '../core/api/api-mappers';
+import { friendlyApiError, mapApiEntity, mapApiList } from '../core/api/api-mappers';
 import { Comanda, ItemComanda, MapaMesaCard, Mesa, ResumoComandas } from '../models/app-data';
 import { CaixaService } from './caixa.service';
 import { MesasService } from './mesas.service';
@@ -87,23 +87,13 @@ export class ComandasService extends ApiBackedState {
     return comandas.length > 0 && comandas.every((comanda) => this.isComandaFinalizada(comanda));
   }
 
-  releaseMesa(mesaId: string): boolean {
+  async releaseMesa(mesaId: string): Promise<boolean> {
     if (!this.canReleaseMesa(mesaId)) {
       return false;
     }
 
-    const releasedAt = new Date().toISOString();
-
-    this.comandas.set(
-      this.comandas().map((comanda) =>
-        comanda.mesaId === mesaId && !comanda.mesaLiberadaEm
-          ? { ...comanda, mesaLiberadaEm: releasedAt, updatedAt: releasedAt }
-          : comanda,
-      ),
-    );
-    void lastValueFrom(this.api.post(`/mesas/${mesaId}/liberar`, {}))
-      .then(async () => this.reload())
-      .catch(() => this.reloadDependents());
+    await lastValueFrom(this.api.post(`/mesas/${mesaId}/liberar`, {}));
+    await this.reloadDependents();
     return true;
   }
 
@@ -115,35 +105,14 @@ export class ComandasService extends ApiBackedState {
     return this.getOpenComandasForMesa(mesa.id).flatMap((comanda) => comanda.itens);
   }
 
-  createComanda(payload: SaveComandaPayload): Comanda {
-    const now = new Date().toISOString();
+  async createComanda(payload: SaveComandaPayload): Promise<Comanda> {
     const updatedItems = this.normalizeItems(payload.items);
-    const mesaId = payload.mesaId || undefined;
 
     this.validateAndApplyStockDelta([], updatedItems);
-
-    const comanda: Comanda = {
-      id: `comanda-${mesaId ? `mesa-${mesaId}` : 'rapida'}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      mesaId,
-      mesaLiberadaEm: undefined,
-      clienteId: payload.clienteId,
-      clienteNome: payload.clienteNome,
-      clienteManual: payload.clienteManual ?? !payload.clienteId,
-      tipo: mesaId ? 'mesa' : 'avulsa',
-      status: 'aberta',
-      paga: false,
-      itens: updatedItems,
-      total: this.getItemsTotal(updatedItems),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.comandas.set([...this.comandas(), comanda]);
-    void lastValueFrom(this.api.post<Comanda>('/comandas', payload)).then(async (created) => {
-      this.comandas.set([...this.comandas().filter((item) => item.id !== comanda.id), this.mapComanda(created)]);
-      await this.reloadDependents();
-    }).catch(() => this.reloadDependents());
-    return comanda;
+    const created = this.mapComanda(await lastValueFrom(this.api.post<Comanda>('/comandas', payload)));
+    this.comandas.set([...this.comandas(), created]);
+    await this.reloadDependents();
+    return created;
   }
 
   createQuickComanda(
@@ -151,11 +120,11 @@ export class ComandasService extends ApiBackedState {
     clienteNome: string,
     items: ItemComanda[],
     mesaId?: string,
-  ): Comanda {
+  ): Promise<Comanda> {
     return this.createComanda({ clienteId, clienteNome, items, mesaId });
   }
 
-  updateComanda(comandaId: string, payload: SaveComandaPayload): Comanda | null {
+  async updateComanda(comandaId: string, payload: SaveComandaPayload): Promise<Comanda | null> {
     const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
 
     if (!existingComanda || !this.isComandaAberta(existingComanda)) {
@@ -167,34 +136,13 @@ export class ComandasService extends ApiBackedState {
 
     this.validateAndApplyStockDelta(existingComanda.itens ?? [], updatedItems);
 
-    const updatedComanda: Comanda = {
-      ...existingComanda,
-      mesaId,
-      mesaLiberadaEm: undefined,
-      clienteId: payload.clienteId,
-      clienteNome: payload.clienteNome,
-      clienteManual: payload.clienteManual ?? !payload.clienteId,
-      tipo: mesaId ? 'mesa' : 'avulsa',
-      status: 'aberta',
-      paga: false,
-      finalizadaEm: undefined,
-      totalFinalizado: undefined,
-      itens: updatedItems,
-      total: this.getItemsTotal(updatedItems),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.comandas.set(
-      this.comandas().map((comanda) => (comanda.id === comandaId ? updatedComanda : comanda)),
-    );
-    void lastValueFrom(this.api.put<Comanda>(`/comandas/${comandaId}`, payload)).then(async (updated) => {
-      this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(updated) : comanda)));
-      await this.reloadDependents();
-    }).catch(() => this.reloadDependents());
+    const updatedComanda = this.mapComanda(await lastValueFrom(this.api.put<Comanda>(`/comandas/${comandaId}`, payload)));
+    this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? updatedComanda : comanda)));
+    await this.reloadDependents();
     return updatedComanda;
   }
 
-  saveItemsForComanda(comandaId: string, items: ItemComanda[]): boolean {
+  async saveItemsForComanda(comandaId: string, items: ItemComanda[]): Promise<boolean> {
     const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
 
     if (!existingComanda || !this.isComandaAberta(existingComanda)) {
@@ -202,30 +150,20 @@ export class ComandasService extends ApiBackedState {
     }
 
     if (items.length === 0) {
-      this.removeOpenComandaById(comandaId);
+      await this.removeOpenComandaById(comandaId);
       return true;
     }
 
     const updatedItems = this.normalizeItems(items);
     this.validateAndApplyStockDelta(existingComanda.itens ?? [], updatedItems);
-    const total = this.getItemsTotal(updatedItems);
-    const updatedAt = new Date().toISOString();
 
-    this.comandas.set(
-      this.comandas().map((currentComanda) =>
-        currentComanda.id === comandaId
-          ? { ...currentComanda, itens: updatedItems, total, updatedAt }
-          : currentComanda,
-      ),
-    );
-    void lastValueFrom(this.api.patch<Comanda>(`/comandas/${comandaId}/itens`, { items: updatedItems })).then(async (updated) => {
-      this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(updated) : comanda)));
-      await this.reloadDependents();
-    }).catch(() => this.reloadDependents());
+    const updated = this.mapComanda(await lastValueFrom(this.api.patch<Comanda>(`/comandas/${comandaId}/itens`, { items: updatedItems })));
+    this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? updated : comanda)));
+    await this.reloadDependents();
     return true;
   }
 
-  finalizeComandaById(comandaId: string): Comanda | null {
+  async finalizeComandaById(comandaId: string): Promise<Comanda | null> {
     const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
 
     if (!existingComanda || !this.isComandaAberta(existingComanda)) {
@@ -242,40 +180,38 @@ export class ComandasService extends ApiBackedState {
       return null;
     }
 
-    const now = new Date().toISOString();
-    const totalFinalizado = this.getItemsTotal(itens);
-    const finalizedComanda: Comanda = {
-      ...existingComanda,
-      status: 'finalizada',
-      paga: true,
-      finalizadaEm: now,
-      totalFinalizado,
-      itens,
-      total: totalFinalizado,
-      updatedAt: now,
-    };
+    let finalizedComanda: Comanda;
 
-    this.comandas.set(
-      this.comandas().map((comanda) => (comanda.id === comandaId ? finalizedComanda : comanda)),
-    );
-    void lastValueFrom(this.api.post<Comanda>(`/comandas/${comandaId}/finalizar`, {})).then(async (finalized) => {
-      this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? this.mapComanda(finalized) : comanda)));
+    try {
+      finalizedComanda = this.mapComanda(await lastValueFrom(this.api.post<Comanda>(`/comandas/${comandaId}/finalizar`, {})));
+    } catch (error) {
       await this.reloadDependents();
-    }).catch(() => this.reloadDependents());
+
+      const currentComanda = this.comandas().find((comanda) => comanda.id === comandaId);
+
+      if (this.isConflictError(error) && currentComanda && this.isComandaFinalizada(currentComanda)) {
+        return currentComanda;
+      }
+
+      throw new Error(friendlyApiError(error, 'Não foi possível registrar a comanda no caixa.'));
+    }
+
+    this.comandas.set(this.comandas().map((comanda) => (comanda.id === comandaId ? finalizedComanda : comanda)));
+    await this.reloadDependents();
     return finalizedComanda;
   }
 
-  closeComandaForMesa(mesaId: string): void {
-    this.getOpenComandasForMesa(mesaId).forEach((comanda) => {
-      this.finalizeComandaById(comanda.id);
-    });
+  async closeComandaForMesa(mesaId: string): Promise<void> {
+    for (const comanda of this.getOpenComandasForMesa(mesaId)) {
+      await this.finalizeComandaById(comanda.id);
+    }
   }
 
-  closeComandaById(comandaId: string): void {
-    this.finalizeComandaById(comandaId);
+  async closeComandaById(comandaId: string): Promise<void> {
+    await this.finalizeComandaById(comandaId);
   }
 
-  removeOpenComandaById(comandaId: string): void {
+  async removeOpenComandaById(comandaId: string): Promise<void> {
     const existingComanda = this.comandas().find((comanda) => comanda.id === comandaId);
 
     if (!existingComanda || !this.isComandaAberta(existingComanda)) {
@@ -283,10 +219,9 @@ export class ComandasService extends ApiBackedState {
     }
 
     this.validateAndApplyStockDelta(existingComanda.itens ?? [], []);
+    await lastValueFrom(this.api.delete(`/comandas/${comandaId}`));
     this.comandas.set(this.comandas().filter((comanda) => comanda.id !== comandaId));
-    void lastValueFrom(this.api.delete(`/comandas/${comandaId}`))
-      .then(async () => this.reloadDependents())
-      .catch(() => this.reloadDependents());
+    await this.reloadDependents();
   }
 
   getCardForMesa(mesa: Mesa): MapaMesaCard {
@@ -390,8 +325,6 @@ export class ComandasService extends ApiBackedState {
   private validateAndApplyStockDelta(previousItems: ItemComanda[], nextItems: ItemComanda[]): void {
     const previousQuantities = this.getQuantitiesByProduct(previousItems);
     const nextQuantities = this.getQuantitiesByProduct(nextItems);
-    const deltas = new Map<string, number>();
-
     for (const productId of new Set([...previousQuantities.keys(), ...nextQuantities.keys()])) {
       const previousQuantity = previousQuantities.get(productId) ?? 0;
       const nextQuantity = nextQuantities.get(productId) ?? 0;
@@ -427,10 +360,10 @@ export class ComandasService extends ApiBackedState {
         );
       }
 
-      deltas.set(productId, -reserveDelta);
     }
 
-    this.produtosService.applyStockDeltas(deltas);
+    // Stock is persisted and recalculated by the backend. The client only validates
+    // the intended delta here so UI state cannot drift when an API call fails.
   }
 
   private getQuantitiesByProduct(items: ItemComanda[]): Map<string, number> {
@@ -441,6 +374,15 @@ export class ComandasService extends ApiBackedState {
     }
 
     return quantities;
+  }
+
+  private isConflictError(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      Number((error as { status?: unknown }).status) === 409
+    );
   }
 
   protected override async loadFromApi(): Promise<void> {

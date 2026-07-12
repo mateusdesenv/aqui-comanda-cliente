@@ -3,9 +3,11 @@ import {
   AuthError,
   GoogleAuthProvider,
   User,
+  browserLocalPersistence,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  setPersistence,
   signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -52,6 +54,7 @@ export class AuthService {
   private readonly uiSettingsService = inject(UiSettingsService);
   private readonly auth = firebaseAuth;
   private readonly provider = new GoogleAuthProvider();
+  private readonly persistenceReady = setPersistence(this.auth, browserLocalPersistence);
   private readonly currentFirebaseUser = signal<User | null>(this.auth.currentUser);
   private readonly currentMembership = signal<Colaborador | null>(null);
   private readonly authReady = signal(false);
@@ -129,6 +132,7 @@ export class AuthService {
   }
 
   async loginWithGoogle(): Promise<AuthenticatedUser> {
+    await this.persistenceReady;
     const credential = await signInWithPopup(this.auth, this.provider);
     return this.activateAuthenticatedUser(credential.user);
   }
@@ -258,6 +262,8 @@ export class AuthService {
       'auth/popup-closed-by-user': 'Login cancelado.',
       'auth/cancelled-popup-request': 'Login cancelado.',
       'auth/popup-blocked': 'O navegador bloqueou a janela de login.',
+      'auth/unauthorized-domain':
+        'Domínio local não autorizado no Firebase. Abra pelo localhost:4200 ou adicione 127.0.0.1 nos domínios autorizados.',
       'auth/network-request-failed': 'Falha de conexão. Verifique sua internet e tente novamente.',
       'auth/too-many-requests': 'Muitas tentativas. Aguarde um momento e tente novamente.',
     };

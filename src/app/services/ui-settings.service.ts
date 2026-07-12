@@ -42,10 +42,6 @@ export class UiSettingsService extends ApiBackedState {
     }).catch(() => this.reload().catch(() => undefined));
   }
 
-  loadFromStorage(): UiScale {
-    return this.scale();
-  }
-
   applyScaleClass(scale: UiScale): void {
     if (typeof document === 'undefined') {
       return;

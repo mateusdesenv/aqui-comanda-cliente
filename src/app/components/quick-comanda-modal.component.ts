@@ -1012,7 +1012,7 @@ export class QuickComandaModalComponent implements OnChanges {
     this.errorMessage = '';
   }
 
-  protected saveComanda(): void {
+  protected async saveComanda(): Promise<void> {
     this.errorMessage = '';
 
     if (this.isSavingComanda) {
@@ -1061,12 +1061,12 @@ export class QuickComandaModalComponent implements OnChanges {
 
     try {
       comanda = this.editingComanda
-        ? this.comandasService.updateComanda(this.editingComanda.id, payload)
-        : this.comandasService.createComanda(payload);
+        ? await this.comandasService.updateComanda(this.editingComanda.id, payload)
+        : await this.comandasService.createComanda(payload);
     } catch (error) {
       this.isSavingComanda = false;
       this.errorMessage =
-        error instanceof Error ? error.message : 'Produto sem estoque disponível.';
+        error instanceof Error ? error.message : 'Não foi possível salvar a comanda no banco.';
       this.activeStep = 'produtos';
       return;
     }
