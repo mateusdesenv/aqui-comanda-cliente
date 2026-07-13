@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { TelaSistema } from '../models/app-data';
+import { isImportExportAvailable } from '../utils/runtime-environment';
 import { AuthService } from './auth.service';
 import { FiliaisService } from './filiais.service';
 
@@ -66,4 +67,12 @@ export const permissionGuard: CanActivateFn = async (route, state) => {
   }
 
   return true;
+};
+
+export const importExportAvailabilityGuard: CanActivateFn = () => {
+  if (isImportExportAvailable()) {
+    return true;
+  }
+
+  return inject(Router).createUrlTree(['/configuracoes/personalizacoes']);
 };

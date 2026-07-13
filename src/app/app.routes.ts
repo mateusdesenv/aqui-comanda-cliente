@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, loginGuard, permissionGuard } from './services/auth.guard';
+import { authGuard, importExportAvailabilityGuard, loginGuard, permissionGuard } from './services/auth.guard';
 
 export const routes: Routes = [
   {
@@ -29,7 +29,7 @@ export const routes: Routes = [
       { path: 'configuracoes/personalizacoes', loadComponent: () => import('./pages/configuracoes-page.component').then((module) => module.ConfiguracoesPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
       { path: 'configuracoes/ordem-menu', loadComponent: () => import('./pages/ordem-menu-page.component').then((module) => module.OrdemMenuPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
       { path: 'configuracoes/filiais', loadComponent: () => import('./pages/filiais-page.component').then((module) => module.FiliaisPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
-      { path: 'configuracoes/importar-exportar', loadComponent: () => import('./pages/importar-exportar-page.component').then((module) => module.ImportarExportarPageComponent), canActivate: [permissionGuard], data: { tela: 'configuracoes' } },
+      { path: 'configuracoes/importar-exportar', loadComponent: () => import('./pages/importar-exportar-page.component').then((module) => module.ImportarExportarPageComponent), canActivate: [importExportAvailabilityGuard, permissionGuard], data: { tela: 'configuracoes' } },
     ],
   },
   { path: '**', redirectTo: 'mapa' },

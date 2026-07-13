@@ -1,20 +1,14 @@
 import { Component, ElementRef, HostListener, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
-import { IconComponent } from './icon.component';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [IconComponent],
+  imports: [],
   template: `
     <header class="topbar">
       <div class="topbar-actions">
-        <label class="topbar-search" aria-label="Buscar no sistema">
-          <app-icon name="search" [size]="22" />
-          <input type="search" placeholder="Buscar no sistema..." />
-        </label>
-
         <div class="topbar-user-menu">
           <button
             class="topbar-avatar-button"
