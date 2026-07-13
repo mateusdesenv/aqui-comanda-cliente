@@ -25,7 +25,9 @@ type StockStatusFilter = 'todos' | 'com_estoque' | 'sem_estoque' | 'baixo';
 
       <section class="stats-grid summary-cards-scroll" aria-label="Resumo do estoque">
         <article class="stat-card neutral">
-          <span class="stat-icon">#</span>
+          <span class="stat-icon stock-stat-icon">
+            <img src="assets/stock-icons/produtos.webp" alt="Produtos cadastrados" width="42" height="42" />
+          </span>
           <div>
             <span class="stat-label">Produtos</span>
             <strong>{{ produtos.length }}</strong>
@@ -33,7 +35,9 @@ type StockStatusFilter = 'todos' | 'com_estoque' | 'sem_estoque' | 'baixo';
           </div>
         </article>
         <article class="stat-card green">
-          <span class="stat-icon">✓</span>
+          <span class="stat-icon stock-stat-icon">
+            <img src="assets/stock-icons/com-estoque.webp" alt="Produtos com estoque" width="42" height="42" />
+          </span>
           <div>
             <span class="stat-label">Com estoque</span>
             <strong>{{ produtosComEstoque }}</strong>
@@ -41,7 +45,9 @@ type StockStatusFilter = 'todos' | 'com_estoque' | 'sem_estoque' | 'baixo';
           </div>
         </article>
         <article class="stat-card amber">
-          <span class="stat-icon">!</span>
+          <span class="stat-icon stock-stat-icon">
+            <img src="assets/stock-icons/sem-estoque.webp" alt="Produtos sem estoque" width="42" height="42" />
+          </span>
           <div>
             <span class="stat-label">Sem estoque</span>
             <strong>{{ produtosSemEstoque }}</strong>
@@ -49,7 +55,9 @@ type StockStatusFilter = 'todos' | 'com_estoque' | 'sem_estoque' | 'baixo';
           </div>
         </article>
         <article class="stat-card dark">
-          <span class="stat-icon">$</span>
+          <span class="stat-icon stock-stat-icon">
+            <img src="assets/stock-icons/valor-estoque.webp" alt="Valor em estoque" width="42" height="42" />
+          </span>
           <div>
             <span class="stat-label">Valor em estoque</span>
             <strong>{{ formatCurrency(valorTotalEstoque) }}</strong>
