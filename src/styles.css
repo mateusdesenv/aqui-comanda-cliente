@@ -5108,13 +5108,25 @@ button:disabled {
   gap: 12px;
 }
 
+.mesa-comanda-card-head {
+  min-width: 0;
+}
+
 .mesa-comanda-card-head strong {
+  min-width: 0;
   color: var(--cd-green-950);
   font-family: var(--font-title);
-  font-size: 1.35rem;
+  font-size: clamp(1.12rem, 1.55vw, 1.35rem);
   font-weight: 400;
-  letter-spacing: -0.055em;
+  letter-spacing: 0;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mesa-comanda-card-head strong.registered-client-name {
+  color: var(--cd-amber-600) !important;
 }
 
 .mesa-comanda-status {
@@ -5405,6 +5417,14 @@ button:disabled {
   width: min(1040px, calc(100vw - 28px));
 }
 
+.stock-entries-page .page-head-action {
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 14px;
+  box-shadow: 0 16px 28px rgba(27, 50, 39, 0.18);
+  white-space: nowrap;
+}
+
 .stock-entry-header-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5452,13 +5472,51 @@ button:disabled {
 
 .stock-entry-item-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 120px 140px 132px auto;
+  grid-template-columns: minmax(220px, 1fr) 178px 140px 132px auto;
   align-items: end;
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--cd-border);
   border-radius: 14px;
   background: var(--cd-bg-soft);
+}
+
+.stock-entry-quantity-stepper {
+  display: grid;
+  grid-template-columns: 48px minmax(64px, 1fr) 48px;
+  gap: 8px;
+  align-items: center;
+}
+
+.stock-entry-quantity-stepper button {
+  min-width: 48px;
+  min-height: 48px;
+  border: 1px solid rgba(27, 50, 39, 0.14);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--cd-green-950);
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 10px 20px rgba(27, 50, 39, 0.08);
+}
+
+.stock-entry-quantity-stepper button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(195, 124, 34, 0.38);
+  box-shadow: 0 14px 26px rgba(27, 50, 39, 0.12);
+}
+
+.stock-entry-quantity-stepper button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.stock-entry-quantity-stepper input {
+  min-height: 48px;
+  text-align: center;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-entry-item-total {
@@ -6459,6 +6517,128 @@ select:disabled,
 
 .caixa-session-modal {
   max-width: 680px;
+}
+
+.caixa-close-modal {
+  max-width: 860px;
+}
+
+.caixa-close-modal-header {
+  display: grid;
+  gap: 10px;
+}
+
+.caixa-close-modal-header .settings-current-badge {
+  justify-self: start;
+}
+
+.caixa-close-total-card {
+  display: grid;
+  gap: 6px;
+  margin: 18px clamp(18px, 3vw, 30px) 0;
+  padding: clamp(18px, 3vw, 26px);
+  border: 1px solid rgba(195, 124, 34, 0.32);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255, 248, 237, 0.96), rgba(255, 255, 255, 0.94));
+}
+
+.caixa-close-total-card span,
+.caixa-close-total-card small {
+  color: var(--cd-text-muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.caixa-close-total-card strong {
+  color: var(--cd-green-950);
+  font-size: clamp(2.25rem, 5vw, 4rem);
+  font-weight: 900;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+
+.caixa-close-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.86fr) minmax(300px, 1.14fr);
+  gap: 14px;
+  padding: 18px clamp(18px, 3vw, 30px) 0;
+}
+
+.caixa-close-section {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.caixa-close-section h3 {
+  margin: 0;
+  color: var(--cd-green-950);
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.caixa-session-summary.compact,
+.caixa-payment-summary.compact {
+  grid-template-columns: 1fr;
+}
+
+.caixa-payment-summary.compact {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.caixa-close-observation {
+  grid-column: 1 / -1;
+}
+
+.caixa-close-empty {
+  padding: 16px;
+  border: 1px dashed rgba(27, 50, 39, 0.18);
+  border-radius: 16px;
+  color: var(--cd-text-muted);
+  font-weight: 800;
+}
+
+.delivery-customer-identity input {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+@media (max-width: 980px) {
+  .stock-entry-item-row,
+  .caixa-close-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-entry-item-row {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .stock-entries-page .page-head-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stock-entry-quantity-stepper {
+    grid-template-columns: 52px minmax(80px, 1fr) 52px;
+  }
+
+  .stock-entry-quantity-stepper button {
+    min-width: 52px;
+    min-height: 52px;
+  }
+
+  .caixa-close-total-card {
+    margin-inline: 16px;
+  }
+
+  .caixa-close-grid {
+    padding-inline: 16px;
+  }
 }
 
 .caixa-session-summary,

@@ -79,12 +79,6 @@ interface PedidoFormModel {
             <h2>Pedidos para entrega</h2>
             <span>{{ filteredPedidos.length }} pedidos encontrados · {{ pedidos.length }} cadastrados</span>
           </div>
-
-          @if (canWritePedidos) {
-            <button class="modal-primary-action pedidos-head-action" type="button" (click)="openCreateModal()">
-              Novo pedido
-            </button>
-          }
         </div>
 
         <div class="pedidos-list">
@@ -275,16 +269,28 @@ interface PedidoFormModel {
                 <h3>Cliente e entrega</h3>
 
                 <div class="pedido-form-grid">
-                  <label>
-                    Cliente
-                    <select
+                  <label class="span-2 delivery-customer-identity">
+                    Identificação do cliente
+                    <input
                       #pedidoFirstField
+                      type="text"
+                      name="clienteNome"
+                      required
+                      placeholder="Digite o nome do cliente"
+                      [(ngModel)]="form.clienteNome"
+                      (ngModelChange)="onClienteNameChange($event)"
+                    />
+                  </label>
+
+                  <label class="span-2">
+                    Cliente cadastrado <span class="optional-label">opcional</span>
+                    <select
                       name="cliente"
                       [(ngModel)]="form.clienteId"
                       [attr.aria-describedby]="errorMessage ? 'pedido-form-error' : null"
                       (ngModelChange)="onClienteChange($event)"
                     >
-                      <option value="">Selecione um cliente</option>
+                      <option value="">Sem cadastro, usar apenas o nome digitado</option>
                       @for (cliente of clientes; track cliente.id) {
                         <option [value]="cliente.id">{{ cliente.nome }} — {{ cliente.cpf }}</option>
                       }
@@ -373,7 +379,7 @@ interface PedidoFormModel {
                   <div class="quick-helper-box pedido-helper-box">
                     <div>
                       <strong>Nenhum cliente cadastrado</strong>
-                      <span>Cadastre um cliente antes de criar pedidos para entrega.</span>
+                      <span>Você pode criar o pedido só com o nome acima ou cadastrar o cliente completo.</span>
                     </div>
                     <a routerLink="/clientes" (click)="closePedidoModal()">Ir para Clientes</a>
                   </div>
@@ -938,11 +944,11 @@ export class PedidosPageComponent {
 
   protected get canSave(): boolean {
     const hasCancellationReason = this.form.status !== 'cancelado' || Boolean(this.form.justificativaCancelamento.trim());
-    return this.canWritePedidos && Boolean(this.form.clienteId) && Boolean(this.form.enderecoEntrega.trim()) && this.items.length > 0 && hasCancellationReason;
+    return this.canWritePedidos && Boolean(this.form.clienteNome.trim()) && Boolean(this.form.enderecoEntrega.trim()) && this.items.length > 0 && hasCancellationReason;
   }
 
   protected get canContinueFromClienteStep(): boolean {
-    return Boolean(this.form.clienteId) && Boolean(this.form.enderecoEntrega.trim());
+    return Boolean(this.form.clienteNome.trim()) && Boolean(this.form.enderecoEntrega.trim());
   }
 
   protected get canContinueCurrentStep(): boolean {
@@ -959,7 +965,7 @@ export class PedidosPageComponent {
 
   protected get selectedClienteLabel(): string {
     const cliente = this.clientes.find((currentCliente) => currentCliente.id === this.form.clienteId);
-    return cliente?.nome || 'Cliente ainda não selecionado';
+    return cliente?.nome || this.form.clienteNome.trim() || 'Cliente ainda não identificado';
   }
 
   protected isPedidoStepComplete(step: PedidoModalStep): boolean {
@@ -1124,9 +1130,10 @@ export class PedidosPageComponent {
 
     this.errorMessage = '';
     const selectedCliente = this.clientes.find((cliente) => cliente.id === this.form.clienteId);
+    const clienteNome = (selectedCliente?.nome || this.form.clienteNome).trim();
 
-    if (!selectedCliente) {
-      this.errorMessage = 'Selecione um cliente para o pedido.';
+    if (!clienteNome) {
+      this.errorMessage = 'Informe o nome do cliente para o pedido.';
       return;
     }
 
@@ -1152,8 +1159,8 @@ export class PedidosPageComponent {
     }
 
     const payload: PedidoPayload = {
-      clienteId: selectedCliente.id,
-      clienteNome: selectedCliente.nome,
+      clienteId: selectedCliente?.id,
+      clienteNome,
       telefone: this.form.telefone.trim() || undefined,
       cepEntrega: this.cepService.formatCep(this.form.cepEntrega).trim() || undefined,
       enderecoEntrega: this.form.enderecoEntrega.trim(),
@@ -1249,7 +1256,6 @@ export class PedidosPageComponent {
     const cliente = this.clientes.find((currentCliente) => currentCliente.id === clienteId);
 
     if (!cliente) {
-      this.form.clienteNome = '';
       return;
     }
 
@@ -1261,6 +1267,16 @@ export class PedidosPageComponent {
 
     if (!this.form.cepEntrega.trim() && cliente.cep) {
       this.form.cepEntrega = cliente.cep;
+    }
+  }
+
+  protected onClienteNameChange(value: string): void {
+    this.errorMessage = '';
+    this.form.clienteNome = value;
+
+    const selectedCliente = this.clientes.find((cliente) => cliente.id === this.form.clienteId);
+    if (selectedCliente && selectedCliente.nome !== value) {
+      this.form.clienteId = '';
     }
   }
 
@@ -1532,6 +1548,7 @@ export class PedidosPageComponent {
     return Boolean(
       this.editingPedido ||
         this.form.clienteId ||
+        this.form.clienteNome ||
         this.form.telefone ||
         this.form.cepEntrega ||
         this.form.enderecoEntrega ||
@@ -1550,8 +1567,8 @@ export class PedidosPageComponent {
 
   private getCurrentStepErrorMessage(): string {
     if (this.activePedidoStep === 'cliente') {
-      if (!this.form.clienteId) {
-        return 'Selecione um cliente para continuar.';
+      if (!this.form.clienteNome.trim()) {
+        return 'Informe o nome do cliente para continuar.';
       }
 
       if (!this.form.enderecoEntrega.trim()) {

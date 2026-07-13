@@ -142,14 +142,28 @@ interface StockEntryForm {
 
                       <label>
                         Quantidade
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          [name]="'quantity-' + index"
-                          required
-                          [(ngModel)]="item.quantity"
-                        />
+                        <div class="stock-entry-quantity-stepper">
+                          <button
+                            type="button"
+                            aria-label="Diminuir quantidade"
+                            [disabled]="!canDecreaseQuantity(item)"
+                            (click)="decrementQuantity(index)"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            [name]="'quantity-' + index"
+                            required
+                            [(ngModel)]="item.quantity"
+                            (ngModelChange)="normalizeQuantity(index)"
+                          />
+                          <button type="button" aria-label="Aumentar quantidade" (click)="incrementQuantity(index)">
+                            +
+                          </button>
+                        </div>
                       </label>
 
                       <label>
@@ -314,6 +328,40 @@ export class StockEntriesPageComponent {
     this.form.items = this.form.items.filter((_, itemIndex) => itemIndex !== index);
   }
 
+  protected incrementQuantity(index: number): void {
+    const item = this.form.items[index];
+
+    if (!item) {
+      return;
+    }
+
+    item.quantity = this.getNormalizedQuantity(item.quantity) + 1;
+  }
+
+  protected decrementQuantity(index: number): void {
+    const item = this.form.items[index];
+
+    if (!item) {
+      return;
+    }
+
+    item.quantity = Math.max(this.getNormalizedQuantity(item.quantity) - 1, 1);
+  }
+
+  protected normalizeQuantity(index: number): void {
+    const item = this.form.items[index];
+
+    if (!item || item.quantity === null) {
+      return;
+    }
+
+    item.quantity = this.getNormalizedQuantity(item.quantity);
+  }
+
+  protected canDecreaseQuantity(item: StockEntryFormItem): boolean {
+    return this.getNormalizedQuantity(item.quantity) > 1;
+  }
+
   protected handleProductChange(index: number): void {
     const selectedProductId = this.form.items[index]?.productId;
 
@@ -358,7 +406,7 @@ export class StockEntriesPageComponent {
         notes: this.form.notes,
         items: this.form.items.map((item) => ({
           productId: item.productId,
-          quantity: Number(item.quantity),
+          quantity: this.getNormalizedQuantity(item.quantity),
           unitCost: Number(item.unitCost),
         })),
       };
@@ -409,6 +457,10 @@ export class StockEntriesPageComponent {
       minimumFractionDigits: 0,
       maximumFractionDigits: 3,
     }).format(value);
+  }
+
+  private getNormalizedQuantity(value: number | null): number {
+    return Math.max(Math.round(Number(value) || 1), 1);
   }
 
   private createEmptyForm(): StockEntryForm {

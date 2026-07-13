@@ -217,36 +217,53 @@ type CaixaViewMode = 'lista' | 'grid';
 
       @if (fecharCaixaModalOpen && sessaoAberta) {
         <div class="comanda-modal-overlay" role="presentation">
-          <section class="management-modal-card caixa-session-modal" role="dialog" aria-modal="true" aria-labelledby="fechar-caixa-title">
+          <section class="management-modal-card caixa-session-modal caixa-close-modal" role="dialog" aria-modal="true" aria-labelledby="fechar-caixa-title">
             <button class="modal-close-button" type="button" aria-label="Cancelar fechamento de caixa" (click)="closeCaixaModals()">X</button>
-            <header class="management-modal-header">
+            <header class="management-modal-header caixa-close-modal-header">
+              <span class="settings-current-badge">Conferência final</span>
               <h2 id="fechar-caixa-title">Fechar caixa</h2>
-              <p>Revise o resumo da sessão antes de confirmar o fechamento.</p>
+              <p>Confira valores, formas de pagamento e registre uma observação antes de encerrar a sessão.</p>
             </header>
 
-            <div class="caixa-session-summary">
-              <div><span>Aberto em</span><strong>{{ formatDateTime(sessaoAberta.abertoEm) }}</strong></div>
-              <div><span>Aberto por</span><strong>{{ sessaoAberta.abertoPorNome || 'Não informado' }}</strong></div>
-              <div><span>Total de entradas</span><strong>{{ formatCurrency(totalSessaoAberta) }}</strong></div>
-              <div><span>Quantidade</span><strong>{{ entradasSessaoAberta.length }} entradas</strong></div>
+            <div class="caixa-close-total-card">
+              <span>Total da sessão</span>
+              <strong>{{ formatCurrency(totalSessaoAberta) }}</strong>
+              <small>{{ entradasSessaoAberta.length }} entrada{{ entradasSessaoAberta.length === 1 ? '' : 's' }} registrada{{ entradasSessaoAberta.length === 1 ? '' : 's' }}</small>
             </div>
 
-            @if (entradasPorFormaPagamentoSessao.length > 0) {
-              <div class="caixa-payment-summary">
-                @for (item of entradasPorFormaPagamentoSessao; track item.forma) {
-                  <div>
-                    <span>{{ item.forma }}</span>
-                    <strong>{{ formatCurrency(item.total) }}</strong>
-                    <small>{{ item.quantidade }} entradas</small>
-                  </div>
-                }
-              </div>
-            }
+            <div class="caixa-close-grid">
+              <section class="caixa-close-section">
+                <h3>Sessão</h3>
+                <div class="caixa-session-summary compact">
+                  <div><span>Aberto em</span><strong>{{ formatDateTime(sessaoAberta.abertoEm) }}</strong></div>
+                  <div><span>Aberto por</span><strong>{{ sessaoAberta.abertoPorNome || 'Não informado' }}</strong></div>
+                </div>
+              </section>
 
-            <label class="modal-field-block">
-              Observação <span class="optional-label">opcional</span>
-              <textarea rows="4" name="observacaoFechamento" placeholder="Observação do fechamento" [(ngModel)]="observacaoFechamento"></textarea>
-            </label>
+              <section class="caixa-close-section">
+                <h3>Pagamentos</h3>
+                @if (entradasPorFormaPagamentoSessao.length > 0) {
+                  <div class="caixa-payment-summary compact">
+                    @for (item of entradasPorFormaPagamentoSessao; track item.forma) {
+                      <div>
+                        <span>{{ item.forma }}</span>
+                        <strong>{{ formatCurrency(item.total) }}</strong>
+                        <small>{{ item.quantidade }} entrada{{ item.quantidade === 1 ? '' : 's' }}</small>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="caixa-close-empty">Nenhuma entrada vinculada a esta sessão.</div>
+                }
+              </section>
+
+              <div class="caixa-close-observation">
+                <label class="modal-field-block">
+                  Observação <span class="optional-label">opcional</span>
+                  <textarea rows="4" name="observacaoFechamento" placeholder="Ex.: Conferido com operador, sem divergências." [(ngModel)]="observacaoFechamento"></textarea>
+                </label>
+              </div>
+            </div>
 
             <div class="form-actions">
               <button class="primary-action-button" type="button" (click)="confirmFecharCaixa()">Fechar caixa</button>
