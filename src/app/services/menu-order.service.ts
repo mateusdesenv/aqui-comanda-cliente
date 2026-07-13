@@ -4,6 +4,7 @@ import { ApiClientService } from '../core/api/api-client.service';
 import { ApiBackedState } from '../core/api/api-backed-state';
 import { TelaSistema } from '../models/app-data';
 import type { IconName } from '../components/icon.component';
+import { isImportExportAvailable } from '../utils/runtime-environment';
 
 export interface NavigationMenuItem {
   id: string;
@@ -17,15 +18,14 @@ export interface NavigationMenuItem {
 }
 
 export const defaultMenuItems: NavigationMenuItem[] = [
-  { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dollar', tela: 'dashboard' },
   { id: 'mapa', label: 'Mapa de Comandas', path: '/mapa', icon: 'commandMap', tela: 'mapa' },
-  { id: 'comandas', label: 'Comandas', path: '/comandas', icon: 'receipt', tela: 'comandas', disabled: true, badge: 'Em breve' },
-  { id: 'mesas', label: 'Mesas', path: '/mesas', icon: 'table', tela: 'mesas' },
+  { id: 'colaboradores', label: 'Colaboradores', path: '/colaboradores', icon: 'shield', tela: 'colaboradores' },
+  { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dollar', tela: 'dashboard' },
+  { id: 'cardapio', label: 'Cardápio', path: '/cardapio', icon: 'cards', tela: 'cardapio' },
   { id: 'clientes', label: 'Clientes', path: '/clientes', icon: 'users', tela: 'clientes' },
   { id: 'pedidos', label: 'Pedidos', path: '/pedidos', icon: 'bell', tela: 'pedidos' },
-  { id: 'colaboradores', label: 'Colaboradores', path: '/colaboradores', icon: 'shield', tela: 'colaboradores' },
+  { id: 'mesas', label: 'Mesas', path: '/mesas', icon: 'table', tela: 'mesas' },
   { id: 'caixa', label: 'Caixa', path: '/caixa', icon: 'register', tela: 'caixa' },
-  { id: 'cardapio', label: 'Cardápio', path: '/cardapio', icon: 'cards', tela: 'cardapio' },
   {
     id: 'estoque',
     label: 'Estoque',
@@ -48,7 +48,6 @@ export const defaultMenuItems: NavigationMenuItem[] = [
       },
     ],
   },
-  { id: 'relatorios', label: 'Relatórios', path: '/relatorios', icon: 'file', tela: 'relatorios', disabled: true, badge: 'Em breve' },
   {
     id: 'configuracoes',
     label: 'Configurações',
@@ -85,6 +84,8 @@ export const defaultMenuItems: NavigationMenuItem[] = [
       },
     ],
   },
+  { id: 'comandas', label: 'Comandas', path: '/comandas', icon: 'receipt', tela: 'comandas', disabled: true, badge: 'Em breve' },
+  { id: 'relatorios', label: 'Relatórios', path: '/relatorios', icon: 'file', tela: 'relatorios', disabled: true, badge: 'Em breve' },
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -92,11 +93,11 @@ export class MenuOrderService extends ApiBackedState {
   private readonly api = inject(ApiClientService);
   private readonly order = signal<string[]>([]);
 
-  readonly menuItems = computed(() => this.applyOrder(defaultMenuItems, this.order()));
+  readonly menuItems = computed(() => this.applyOrder(this.getAvailableMenuItems(), this.order()));
 
 
   getDefaultMenuItems(): NavigationMenuItem[] {
-    return [...defaultMenuItems];
+    return [...this.getAvailableMenuItems()];
   }
 
   getOrderedMenuItems(): NavigationMenuItem[] {
@@ -134,7 +135,7 @@ export class MenuOrderService extends ApiBackedState {
   }
 
   private normalizeOrder(order: unknown[]): string[] {
-    const validIds = new Set(defaultMenuItems.map((item) => item.id));
+    const validIds = new Set(this.getAvailableMenuItems().map((item) => item.id));
     const normalizedOrder: string[] = [];
 
     for (const itemId of order) {
@@ -148,6 +149,23 @@ export class MenuOrderService extends ApiBackedState {
     }
 
     return normalizedOrder;
+  }
+
+  private getAvailableMenuItems(): NavigationMenuItem[] {
+    if (isImportExportAvailable()) {
+      return defaultMenuItems;
+    }
+
+    return defaultMenuItems.map((item) => {
+      if (!item.children?.length) {
+        return item;
+      }
+
+      return {
+        ...item,
+        children: item.children.filter((child) => child.id !== 'configuracoes-importar-exportar'),
+      };
+    });
   }
 
   protected override async loadFromApi(): Promise<void> {
