@@ -1,8 +1,9 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ComandaCardComponent } from '../components/comanda-card.component';
 import { ComandaDetailModalComponent } from '../components/comanda-detail-modal.component';
+import { ConfirmationModalComponent } from '../components/confirmation-modal.component';
 import { QuickComandaModalComponent } from '../components/quick-comanda-modal.component';
 import { IconComponent } from '../components/icon.component';
 import { StatCardComponent } from '../components/stat-card.component';
@@ -22,6 +23,7 @@ import { AuthService } from '../services/auth.service';
     StatCardComponent,
     ComandaCardComponent,
     ComandaDetailModalComponent,
+    ConfirmationModalComponent,
     QuickComandaModalComponent,
   ],
   template: `
@@ -168,6 +170,18 @@ import { AuthService } from '../services/auth.service';
           </div>
         </section>
       }
+
+      @if (caixaRequiredModalOpen) {
+        <app-confirmation-modal
+          title="Abra o caixa para finalizar"
+          description="O caixa precisa estar aberto para marcar esta comanda como paga e registrar a entrada desta operação."
+          confirmLabel="Abrir caixa"
+          cancelLabel="Agora não"
+          titleId="quick-comanda-caixa-required-title"
+          (confirm)="goToCaixaFromRequiredModal()"
+          (cancel)="closeCaixaRequiredModal()"
+        />
+      }
     </div>
   `,
 })
@@ -176,6 +190,7 @@ export class MapaComandasPageComponent {
   private readonly caixaService = inject(CaixaService);
   private readonly mesasService = inject(MesasService);
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   protected get canWriteMapa(): boolean {
     return this.authService.canWrite('mapa');
@@ -188,6 +203,7 @@ export class MapaComandasPageComponent {
   protected editingQuickComanda: Comanda | null = null;
   protected quickComandaInitialMesaId = '';
   protected quickFinishCandidate: Comanda | null = null;
+  protected caixaRequiredModalOpen = false;
 
   protected get cards(): MapaMesaCard[] {
     return this.comandasService.getCardsForMesas(this.mesasService.mesas());
@@ -297,8 +313,7 @@ export class MapaComandasPageComponent {
     }
 
     if (!this.caixaService.hasCaixaAberto()) {
-      this.quickFinishCandidate = null;
-      this.feedbackMessage = 'Abra o caixa antes de registrar pagamentos.';
+      this.openCaixaRequiredModal();
       return;
     }
 
@@ -345,6 +360,22 @@ export class MapaComandasPageComponent {
 
   protected closeQuickComanda(comanda: Comanda): void {
     this.openQuickFinishConfirmation(comanda);
+  }
+
+  protected openCaixaRequiredModal(): void {
+    this.quickFinishCandidate = null;
+    this.feedbackMessage = '';
+    this.caixaRequiredModalOpen = true;
+  }
+
+  protected closeCaixaRequiredModal(): void {
+    this.caixaRequiredModalOpen = false;
+  }
+
+  protected async goToCaixaFromRequiredModal(): Promise<void> {
+    this.caixaRequiredModalOpen = false;
+    this.quickFinishCandidate = null;
+    await this.router.navigateByUrl('/caixa');
   }
 
   protected getMesaLabel(mesaId: string): string {

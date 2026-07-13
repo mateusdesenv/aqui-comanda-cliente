@@ -1,11 +1,12 @@
 import { Component, EventEmitter, Input, OnChanges, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Comanda, ItemComanda, Mesa, ProductCategory, Produto } from '../models/app-data';
 import { ComandasService } from '../services/comandas.service';
 import { CaixaService } from '../services/caixa.service';
 import { ProdutosService } from '../services/produtos.service';
 import { PrinterComandaService, type PrintComandaPayload } from '../services/printer-comanda.service';
+import { ConfirmationModalComponent } from './confirmation-modal.component';
 import { IconComponent } from './icon.component';
 
 type CategoryTab = ProductCategory | 'Todos';
@@ -15,7 +16,7 @@ type StockFilterMode = 'in_stock' | 'all';
 @Component({
   selector: 'app-comanda-detail-modal',
   standalone: true,
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, ConfirmationModalComponent],
   template: `
     <div class="comanda-modal-overlay" role="presentation">
       <section
@@ -494,6 +495,18 @@ type StockFilterMode = 'in_stock' | 'all';
           </div>
         </section>
       }
+
+      @if (caixaRequiredModalOpen) {
+        <app-confirmation-modal
+          title="Abra o caixa para finalizar"
+          description="O caixa precisa estar aberto para marcar esta comanda como paga e registrar a entrada desta operação."
+          confirmLabel="Abrir caixa"
+          cancelLabel="Agora não"
+          titleId="mesa-comanda-caixa-required-title"
+          (confirm)="goToCaixaFromRequiredModal()"
+          (cancel)="closeCaixaRequiredModal()"
+        />
+      }
     </div>
   `,
 })
@@ -508,6 +521,7 @@ export class ComandaDetailModalComponent implements OnChanges {
   private readonly caixaService = inject(CaixaService);
   private readonly produtosService = inject(ProdutosService);
   private readonly printerComandaService = inject(PrinterComandaService);
+  private readonly router = inject(Router);
 
   protected activeCategory: CategoryTab = 'Todos';
   protected menuViewMode: MenuViewMode = 'grid';
@@ -517,6 +531,7 @@ export class ComandaDetailModalComponent implements OnChanges {
   protected items: ItemComanda[] = [];
   protected finishCandidate: Comanda | null = null;
   protected releaseMesaConfirmationOpen = false;
+  protected caixaRequiredModalOpen = false;
   protected modalFeedback = '';
   protected modalFeedbackType: 'success' | 'error' = 'success';
   protected isPrintingComanda = false;
@@ -899,8 +914,7 @@ export class ComandaDetailModalComponent implements OnChanges {
     }
 
     if (!this.caixaService.hasCaixaAberto()) {
-      this.finishCandidate = null;
-      this.showModalFeedback('Abra o caixa antes de registrar pagamentos.', 'error');
+      this.openCaixaRequiredModal();
       return;
     }
 
@@ -947,6 +961,23 @@ export class ComandaDetailModalComponent implements OnChanges {
 
   protected cancelReleaseMesaConfirmation(): void {
     this.releaseMesaConfirmationOpen = false;
+  }
+
+  protected openCaixaRequiredModal(): void {
+    this.finishCandidate = null;
+    this.modalFeedback = '';
+    this.caixaRequiredModalOpen = true;
+  }
+
+  protected closeCaixaRequiredModal(): void {
+    this.caixaRequiredModalOpen = false;
+  }
+
+  protected async goToCaixaFromRequiredModal(): Promise<void> {
+    this.caixaRequiredModalOpen = false;
+    this.finishCandidate = null;
+    this.close.emit();
+    await this.router.navigateByUrl('/caixa');
   }
 
   protected async confirmReleaseMesa(): Promise<void> {
