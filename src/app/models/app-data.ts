@@ -1,16 +1,5 @@
 export type ComandaStatus = 'aberta' | 'finalizada';
-export type ProductCategory =
-  | 'Bebidas'
-  | 'Sinuca'
-  | 'Petiscos'
-  | 'Lanches'
-  | 'Drinks'
-  | 'Cervejas'
-  | 'Chopp'
-  | 'Extras'
-  | 'Destilados'
-  | 'Porções'
-  | 'Sobremesas';
+export type ProductCategory = string;
 export type ProdutoTamanho = 'mini' | 'muito_pequeno' | 'pequeno' | 'medio' | 'grande';
 export type MesaStatus = 'livre' | 'reservada' | 'inativa';
 export type MapaMesaStatus = 'livre' | 'ocupada' | 'reservada' | 'inativa';
@@ -204,6 +193,15 @@ export interface Produto {
   updatedAt: string;
 }
 
+export interface ProdutoCategoria {
+  id: string;
+  titulo: ProductCategory;
+  icone: string;
+  imagem?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface StockEntry {
   id: string;
   date: string;
@@ -265,19 +263,21 @@ export interface MapaMesaCard {
   mesaLiberacaoPendente?: boolean;
 }
 
-export const productCategories: ProductCategory[] = [
-  'Bebidas',
-  'Sinuca',
-  'Petiscos',
-  'Lanches',
-  'Drinks',
-  'Cervejas',
-  'Chopp',
-  'Extras',
-  'Destilados',
-  'Porções',
-  'Sobremesas',
+export const defaultProductCategories: ProdutoCategoria[] = [
+  { id: 'default-bebidas', titulo: 'Bebidas', icone: 'cards', imagem: 'assets/category-icons/bebidas.webp' },
+  { id: 'default-sinuca', titulo: 'Sinuca', icone: 'table', imagem: 'assets/category-icons/sinuca.webp' },
+  { id: 'default-petiscos', titulo: 'Petiscos', icone: 'receipt', imagem: 'assets/category-icons/petiscos.webp' },
+  { id: 'default-lanches', titulo: 'Lanches', icone: 'cards', imagem: 'assets/category-icons/lanches.webp' },
+  { id: 'default-drinks', titulo: 'Drinks', icone: 'bell', imagem: 'assets/category-icons/drinks.webp' },
+  { id: 'default-cervejas', titulo: 'Cervejas', icone: 'register', imagem: 'assets/category-icons/cervejas.webp' },
+  { id: 'default-chopp', titulo: 'Chopp', icone: 'dollar', imagem: 'assets/category-icons/chopp.webp' },
+  { id: 'default-extras', titulo: 'Extras', icone: 'file', imagem: 'assets/category-icons/extras.webp' },
+  { id: 'default-destilados', titulo: 'Destilados', icone: 'shield', imagem: 'assets/category-icons/destilados.webp' },
+  { id: 'default-porcoes', titulo: 'Porções', icone: 'receipt', imagem: 'assets/category-icons/porcoes.webp' },
+  { id: 'default-sobremesas', titulo: 'Sobremesas', icone: 'check', imagem: 'assets/category-icons/sobremesas.webp' },
 ];
+
+export const productCategories: ProductCategory[] = defaultProductCategories.map((category) => category.titulo);
 
 export const produtoTamanhos: Array<{ id: ProdutoTamanho; label: string; ordem: number }> = [
   { id: 'mini', label: 'Mini', ordem: 1 },
@@ -295,7 +295,7 @@ export const telasSistema: TelaPermissaoConfig[] = [
   { tela: 'clientes', label: 'Clientes', path: '/clientes' },
   { tela: 'pedidos', label: 'Pedidos', path: '/pedidos' },
   { tela: 'caixa', label: 'Caixa', path: '/caixa' },
-  { tela: 'cardapio', label: 'Cardápio / Produtos', path: '/cardapio' },
+  { tela: 'cardapio', label: 'Cardápio / Produtos', path: '/cardapio/produtos' },
   { tela: 'estoque', label: 'Entrada de Estoque', path: '/estoque/entradas' },
   { tela: 'relatorios', label: 'Relatórios', path: '/relatorios' },
   { tela: 'configuracoes', label: 'Configurações', path: '/configuracoes/personalizacoes' },
