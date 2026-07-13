@@ -2471,6 +2471,11 @@ img {
     min-width: 850px;
   }
 
+  .category-management-table .management-table-head,
+  .category-management-table .management-table-row {
+    min-width: 620px;
+  }
+
   .client-table .management-table-head,
   .client-table .management-table-row {
     min-width: 820px;
@@ -5425,6 +5430,21 @@ button:disabled {
   white-space: nowrap;
 }
 
+.stock-management-page .page-head-action {
+  display: inline-flex;
+  min-width: 136px;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 22px;
+  border-radius: 14px;
+  line-height: 1;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 16px 28px rgba(27, 50, 39, 0.18);
+}
+
 .stock-entry-header-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6519,6 +6539,34 @@ select:disabled,
   max-width: 680px;
 }
 
+.caixa-session-modal-body {
+  display: grid;
+  gap: 18px;
+  padding: 20px clamp(20px, 3.5vw, 34px) clamp(22px, 3.5vw, 34px);
+}
+
+.caixa-session-modal .modal-field-block {
+  gap: 10px;
+}
+
+.caixa-session-modal .modal-field-block textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: 14px 16px;
+  resize: vertical;
+}
+
+.caixa-session-modal .form-actions {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.caixa-session-modal .form-actions button {
+  width: 100%;
+  min-height: 52px;
+  justify-content: center;
+}
+
 .caixa-close-modal {
   max-width: 860px;
 }
@@ -6535,7 +6583,7 @@ select:disabled,
 .caixa-close-total-card {
   display: grid;
   gap: 6px;
-  margin: 18px clamp(18px, 3vw, 30px) 0;
+  margin: 0;
   padding: clamp(18px, 3vw, 26px);
   border: 1px solid rgba(195, 124, 34, 0.32);
   border-radius: 20px;
@@ -6563,7 +6611,7 @@ select:disabled,
   display: grid;
   grid-template-columns: minmax(240px, 0.86fr) minmax(300px, 1.14fr);
   gap: 14px;
-  padding: 18px clamp(18px, 3vw, 30px) 0;
+  padding: 0;
 }
 
 .caixa-close-section {
@@ -6633,11 +6681,11 @@ select:disabled,
   }
 
   .caixa-close-total-card {
-    margin-inline: 16px;
+    margin-inline: 0;
   }
 
   .caixa-close-grid {
-    padding-inline: 16px;
+    padding-inline: 0;
   }
 }
 
@@ -6723,6 +6771,74 @@ select:disabled,
   font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.category-management-table .management-table-head,
+.category-management-table .management-table-row {
+  grid-template-columns: minmax(220px, 1.5fr) minmax(180px, 0.8fr) minmax(96px, 0.35fr);
+}
+
+.category-icon-badge,
+.category-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-icon-badge {
+  width: fit-content;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(20, 83, 45, 0.14);
+  border-radius: 999px;
+  background: rgba(20, 83, 45, 0.07);
+  color: var(--cd-green-900);
+  font-size: 0.8rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.category-icon-badge img,
+.category-icon-preview img {
+  display: block;
+  object-fit: contain;
+}
+
+.category-icon-badge img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.category-icon-preview {
+  min-height: 58px;
+  padding: 12px 14px;
+  border: 1px solid rgba(214, 214, 211, 0.86);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.category-icon-preview span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: var(--cd-primary-dark);
+  background: rgba(195, 124, 34, 0.12);
+}
+
+.category-icon-preview span img {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+}
+
+.category-icon-preview strong {
+  color: var(--cd-text);
+  font-size: 0.95rem;
 }
 
 .product-more-actions,
@@ -8252,6 +8368,18 @@ textarea:focus-visible,
 .stat-icon,
 .dashboard-kpi-icon {
   border-radius: 16px;
+}
+
+.stock-stat-icon {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.stock-stat-icon img {
+  display: block;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 10px;
 }
 
 .summary-cards-scroll {
