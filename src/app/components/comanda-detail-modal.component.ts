@@ -96,18 +96,11 @@ type StockFilterMode = 'in_stock' | 'all';
                   (click)="selectComanda(comanda)"
                 >
                   <div class="mesa-comanda-card-head">
-                    <strong>{{ getComandaCardTitle(comanda) }}</strong>
+                    <strong [class.registered-client-name]="isRegisteredClienteComanda(comanda)">{{ getComandaCardDisplayTitle(comanda) }}</strong>
                     <span class="mesa-comanda-status" [class.finalized]="isFinalized(comanda)">
                       {{ getComandaStatusLabel(comanda) }}
                     </span>
                   </div>
-
-                  <span
-                    class="mesa-comanda-client"
-                    [class.registered-client-name]="isRegisteredClienteComanda(comanda)"
-                  >{{
-                    comanda.clienteNome || 'Cliente não informado'
-                  }}</span>
 
                   <div class="mesa-comanda-card-meta">
                     <span
@@ -841,6 +834,10 @@ export class ComandaDetailModalComponent implements OnChanges {
   protected getComandaCardTitle(comanda: Comanda): string {
     const index = this.mesaComandas.findIndex((item) => item.id === comanda.id) + 1;
     return `Comanda ${index || 1}`;
+  }
+
+  protected getComandaCardDisplayTitle(comanda: Comanda): string {
+    return `${comanda.clienteNome || 'Cliente não informado'} - ${this.getComandaCardTitle(comanda)}`;
   }
 
   protected getComandaStatusLabel(comanda: Comanda): string {
