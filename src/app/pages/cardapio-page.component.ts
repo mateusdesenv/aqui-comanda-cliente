@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { ProductCategory, Produto, ProdutoTamanho } from '../models/app-data';
 import { ProdutoPayload, ProdutosService } from '../services/produtos.service';
+import { ProdutoCategoriasService } from '../services/produto-categorias.service';
 
 type ProdutoStatusFilter = 'todos' | 'ativo' | 'inativo';
 type ProdutoDescriptionFilter = 'todos' | 'com_descricao' | 'sem_descricao';
@@ -285,13 +286,13 @@ interface ProdutoFormModel {
 })
 export class CardapioPageComponent {
   private readonly produtosService = inject(ProdutosService);
+  private readonly produtoCategoriasService = inject(ProdutoCategoriasService);
   private readonly authService = inject(AuthService);
 
   protected get canWriteCardapio(): boolean {
     return this.authService.canWrite('cardapio');
   }
 
-  protected readonly categories = this.produtosService.categories;
   protected readonly tamanhoOptions = this.produtosService.tamanhos;
   protected produtos = this.produtosService.getProdutos();
   protected search = '';
@@ -308,6 +309,12 @@ export class CardapioPageComponent {
   protected errorMessage = '';
   protected successMessage = '';
   protected form: ProdutoFormModel = this.createEmptyForm();
+
+  protected get categories(): ProductCategory[] {
+    const categoryTitles = this.produtoCategoriasService.getCategoryTitles();
+    const productCategories = this.produtos.map((produto) => produto.categoria);
+    return Array.from(new Set([...categoryTitles, ...productCategories])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }
 
   @HostListener('document:click')
   protected closeActionMenus(): void {
@@ -540,7 +547,7 @@ export class CardapioPageComponent {
     return {
       nome: '',
       descricao: '',
-      categoria: 'Lanches',
+      categoria: this.categories[0] ?? 'Lanches',
       tamanho: 'medio',
       preco: null,
       ativo: true,

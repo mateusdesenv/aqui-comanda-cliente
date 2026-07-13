@@ -26,6 +26,7 @@ import { FiliaisService } from './filiais.service';
 import { MenuOrderService } from './menu-order.service';
 import { MesasService } from './mesas.service';
 import { PedidosService } from './pedidos.service';
+import { ProdutoCategoriasService } from './produto-categorias.service';
 import { ProdutosService } from './produtos.service';
 import { StockEntriesService } from './stock-entries.service';
 import { UiSettingsService } from './ui-settings.service';
@@ -49,6 +50,7 @@ export class AuthService {
   private readonly menuOrderService = inject(MenuOrderService);
   private readonly mesasService = inject(MesasService);
   private readonly pedidosService = inject(PedidosService);
+  private readonly produtoCategoriasService = inject(ProdutoCategoriasService);
   private readonly produtosService = inject(ProdutosService);
   private readonly stockEntriesService = inject(StockEntriesService);
   private readonly uiSettingsService = inject(UiSettingsService);
@@ -326,6 +328,7 @@ export class AuthService {
     this.menuOrderService.clearData();
     this.mesasService.clearData();
     this.pedidosService.clearData();
+    this.produtoCategoriasService.clearData();
     this.produtosService.clearData();
     this.stockEntriesService.clearData();
     this.uiSettingsService.clearData();
@@ -348,6 +351,7 @@ export class AuthService {
       this.menuOrderService.ensureLoaded().catch(() => undefined),
       this.mesasService.ensureLoaded().catch(() => undefined),
       this.pedidosService.ensureLoaded().catch(() => undefined),
+      this.produtoCategoriasService.ensureLoaded().catch(() => undefined),
       this.produtosService.ensureLoaded().catch(() => undefined),
       this.stockEntriesService.ensureLoaded().catch(() => undefined),
       this.uiSettingsService.ensureLoaded().catch(() => undefined),

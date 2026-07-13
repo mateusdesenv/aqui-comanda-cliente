@@ -8,9 +8,9 @@ import {
   Produto,
   ProdutoTamanho,
   StockEntryItem,
-  productCategories,
   produtoTamanhos,
 } from '../models/app-data';
+import { ProdutoCategoriasService } from './produto-categorias.service';
 
 export interface ProdutoPayload {
   nome: string;
@@ -23,10 +23,11 @@ export interface ProdutoPayload {
 
 @Injectable({ providedIn: 'root' })
 export class ProdutosService extends ApiBackedState {
-  readonly categories = productCategories;
-  readonly tamanhos = produtoTamanhos;
-
   private readonly api = inject(ApiClientService);
+  private readonly produtoCategoriasService = inject(ProdutoCategoriasService);
+
+  readonly categories = this.produtoCategoriasService.categoryTitles;
+  readonly tamanhos = produtoTamanhos;
 
   readonly produtos = signal<Produto[]>([]);
   readonly produtosAtivos = computed(() => this.produtos().filter((produto) => produto.ativo));
@@ -34,6 +35,10 @@ export class ProdutosService extends ApiBackedState {
 
   getProdutos(): Produto[] {
     return this.produtos();
+  }
+
+  getCategories(): ProductCategory[] {
+    return this.produtoCategoriasService.getCategoryTitles();
   }
 
   clearData(): void {
